@@ -4,44 +4,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { BookOpen } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LoginModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSwitchToRegister: () => void;
 }
 
-const LoginModal = ({ open, onOpenChange }: LoginModalProps) => {
+const LoginModal = ({ open, onOpenChange, onSwitchToRegister }: LoginModalProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate authentication
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Welcome back!",
-        description: `Logged in successfully as ${role}`,
-      });
+    try {
+      await signIn(email, password);
       onOpenChange(false);
-      
-      // Redirect based on role
-      if (role === "student") {
-        window.location.href = "/student-dashboard";
-      } else if (role === "teacher") {
-        window.location.href = "/teacher-dashboard";
-      } else if (role === "admin") {
-        window.location.href = "/admin-dashboard";
-      }
-    }, 1500);
+      setEmail("");
+      setPassword("");
+    } catch (error) {
+      // Error is handled in the auth context
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -79,20 +70,6 @@ const LoginModal = ({ open, onOpenChange }: LoginModalProps) => {
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="role">I am a</Label>
-            <Select value={role} onValueChange={setRole} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select your role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="student">Student</SelectItem>
-                <SelectItem value="teacher">Teacher</SelectItem>
-                <SelectItem value="admin">Administrator</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
           <Button 
             type="submit" 
             className="w-full bg-emerald-600 hover:bg-emerald-700"
@@ -106,7 +83,10 @@ const LoginModal = ({ open, onOpenChange }: LoginModalProps) => {
             <button
               type="button"
               className="text-emerald-600 hover:underline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                onOpenChange(false);
+                onSwitchToRegister();
+              }}
             >
               Sign up here
             </button>

@@ -5,15 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { BookOpen, UserPlus } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface RegisterModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSwitchToLogin: () => void;
 }
 
-const RegisterModal = ({ open, onOpenChange }: RegisterModalProps) => {
+const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalProps) => {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -25,7 +26,7 @@ const RegisterModal = ({ open, onOpenChange }: RegisterModalProps) => {
     grade: ""
   });
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const { signUp } = useAuth();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -35,32 +36,39 @@ const RegisterModal = ({ open, onOpenChange }: RegisterModalProps) => {
     e.preventDefault();
     
     if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Password mismatch",
-        description: "Please make sure your passwords match",
-        variant: "destructive"
-      });
       return;
     }
 
     setIsLoading(true);
 
-    // Simulate registration
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Welcome to EthioLearn!",
-        description: `Account created successfully as ${formData.role}`,
-      });
+    try {
+      const userData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        role: formData.role,
+        school: formData.school,
+        grade: formData.grade
+      };
+
+      await signUp(formData.email, formData.password, userData);
       onOpenChange(false);
       
-      // Redirect based on role
-      if (formData.role === "student") {
-        window.location.href = "/student-dashboard";
-      } else if (formData.role === "teacher") {
-        window.location.href = "/teacher-dashboard";
-      }
-    }, 2000);
+      // Reset form
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        role: "",
+        school: "",
+        grade: ""
+      });
+    } catch (error) {
+      // Error is handled in the auth context
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,6 +126,7 @@ const RegisterModal = ({ open, onOpenChange }: RegisterModalProps) => {
               <SelectContent>
                 <SelectItem value="student">Student</SelectItem>
                 <SelectItem value="teacher">Teacher</SelectItem>
+                <SelectItem value="admin">Administrator</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -189,7 +198,10 @@ const RegisterModal = ({ open, onOpenChange }: RegisterModalProps) => {
             <button
               type="button"
               className="text-emerald-600 hover:underline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                onOpenChange(false);
+                onSwitchToLogin();
+              }}
             >
               Sign in here
             </button>

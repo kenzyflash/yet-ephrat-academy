@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { BookOpen, Users, Award, Clock, Search, Star, Play, CheckCircle } from "lucide-react";
+import { BookOpen, Users, Award, Clock, Search, Star, Play, LogOut } from "lucide-react";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const { user, signOut } = useAuth();
 
   const featuredCourses = [
     {
@@ -59,6 +61,16 @@ const Index = () => {
     { icon: Clock, value: "24/7", label: "Access Anytime" }
   ];
 
+  const handleSwitchToRegister = () => {
+    setShowLogin(false);
+    setShowRegister(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegister(false);
+    setShowLogin(true);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
       {/* Header */}
@@ -74,12 +86,27 @@ const Index = () => {
             <a href="#contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</a>
           </div>
           <div className="flex items-center space-x-3">
-            <Button variant="outline" onClick={() => setShowLogin(true)}>
-              Sign In
-            </Button>
-            <Button onClick={() => setShowRegister(true)} className="bg-emerald-600 hover:bg-emerald-700">
-              Get Started
-            </Button>
+            {user ? (
+              <>
+                <span className="text-sm text-gray-600">Welcome, {user.email}</span>
+                <Button variant="outline" onClick={() => window.location.href = "/student-dashboard"}>
+                  Dashboard
+                </Button>
+                <Button variant="outline" onClick={signOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setShowLogin(true)}>
+                  Sign In
+                </Button>
+                <Button onClick={() => setShowRegister(true)} className="bg-emerald-600 hover:bg-emerald-700">
+                  Get Started
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -107,7 +134,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16">
           {stats.map((stat, index) => (
             <div key={index} className="text-center animate-fade-in">
@@ -119,7 +145,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Course Search */}
       <section id="courses" className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-gray-800 mb-4">Explore Our Courses</h2>
@@ -136,7 +161,6 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Featured Courses */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {featuredCourses.map((course) => (
             <Card key={course.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
@@ -185,7 +209,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Features Section */}
       <section className="bg-white/60 backdrop-blur-sm py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -221,7 +244,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-gray-800 text-white py-12">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -266,9 +288,16 @@ const Index = () => {
         </div>
       </footer>
 
-      {/* Modals */}
-      <LoginModal open={showLogin} onOpenChange={setShowLogin} />
-      <RegisterModal open={showRegister} onOpenChange={setShowRegister} />
+      <LoginModal 
+        open={showLogin} 
+        onOpenChange={setShowLogin}
+        onSwitchToRegister={handleSwitchToRegister}
+      />
+      <RegisterModal 
+        open={showRegister} 
+        onOpenChange={setShowRegister}
+        onSwitchToLogin={handleSwitchToLogin}
+      />
     </div>
   );
 };
