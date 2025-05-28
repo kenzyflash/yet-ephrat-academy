@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,9 +80,9 @@ const Index = () => {
             <h1 className="text-2xl font-bold text-gray-800">EthioLearn</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
-            <a href="#courses" className="text-gray-600 hover:text-emerald-600 transition-colors">Courses</a>
-            <a href="#about" className="text-gray-600 hover:text-emerald-600 transition-colors">About</a>
-            <a href="#contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</a>
+            <a href="/courses" className="text-gray-600 hover:text-emerald-600 transition-colors">Courses</a>
+            <a href="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">About</a>
+            <a href="/contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</a>
           </div>
           <div className="flex items-center space-x-3">
             {user ? (
@@ -206,6 +205,13 @@ const Index = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Button onClick={() => window.location.href = "/courses"} size="lg" variant="outline" className="text-lg px-8 py-3">
+            <BookOpen className="mr-2 h-5 w-5" />
+            View All Courses
+          </Button>
         </div>
       </section>
 
