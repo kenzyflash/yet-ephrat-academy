@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -19,9 +18,34 @@ import {
   Users,
   Award
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const StudentDashboard = () => {
   const [selectedTab, setSelectedTab] = useState("overview");
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      window.location.href = "/";
+    }
+  }, [user, loading]);
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <BookOpen className="h-16 w-16 text-emerald-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated (this shouldn't show due to useEffect, but safety check)
+  if (!user) {
+    return null;
+  }
 
   const enrolledCourses = [
     {
@@ -121,7 +145,7 @@ const StudentDashboard = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, Abebe!</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {user.email?.split('@')[0] || 'Student'}!</h1>
           <p className="text-gray-600">Ready to continue your learning journey today?</p>
         </div>
 

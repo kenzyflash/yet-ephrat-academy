@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,11 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookOpen, Search, Star, Clock, Users, Play, Filter } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import LoginModal from "@/components/auth/LoginModal";
+import RegisterModal from "@/components/auth/RegisterModal";
 
 const Courses = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedLevel, setSelectedLevel] = useState("all");
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const { user } = useAuth();
 
   const categories = [
     { value: "all", label: "All Categories" },
@@ -159,6 +164,24 @@ const Courses = () => {
     return matchesSearch && matchesCategory && matchesLevel;
   });
 
+  const handleSwitchToRegister = () => {
+    setShowLogin(false);
+    setShowRegister(true);
+  };
+
+  const handleSwitchToLogin = () => {
+    setShowRegister(false);
+    setShowLogin(true);
+  };
+
+  const handleEnrollClick = () => {
+    if (user) {
+      window.location.href = "/student-dashboard";
+    } else {
+      setShowRegister(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
       {/* Header */}
@@ -282,7 +305,7 @@ const Courses = () => {
                     {course.rating}
                   </div>
                 </div>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button onClick={handleEnrollClick} className="w-full bg-emerald-600 hover:bg-emerald-700">
                   <Play className="mr-2 h-4 w-4" />
                   Enroll Now
                 </Button>
@@ -300,6 +323,17 @@ const Courses = () => {
           </div>
         )}
       </section>
+
+      <LoginModal 
+        open={showLogin} 
+        onOpenChange={setShowLogin}
+        onSwitchToRegister={handleSwitchToRegister}
+      />
+      <RegisterModal 
+        open={showRegister} 
+        onOpenChange={setShowRegister}
+        onSwitchToLogin={handleSwitchToLogin}
+      />
     </div>
   );
 };

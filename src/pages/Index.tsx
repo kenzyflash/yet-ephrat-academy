@@ -70,6 +70,14 @@ const Index = () => {
     setShowLogin(true);
   };
 
+  const handleEnrollClick = () => {
+    if (user) {
+      window.location.href = "/student-dashboard";
+    } else {
+      setShowRegister(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
       {/* Header */}
@@ -122,7 +130,7 @@ const Index = () => {
             Access quality education, track your progress, and achieve your dreams.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <Button size="lg" onClick={() => setShowRegister(true)} className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3">
+            <Button size="lg" onClick={handleEnrollClick} className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3">
               <Play className="mr-2 h-5 w-5" />
               Start Learning Today
             </Button>
@@ -198,7 +206,7 @@ const Index = () => {
                     {course.rating}
                   </div>
                 </div>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Button onClick={handleEnrollClick} className="w-full bg-emerald-600 hover:bg-emerald-700">
                   <Play className="mr-2 h-4 w-4" />
                   Enroll Now
                 </Button>
