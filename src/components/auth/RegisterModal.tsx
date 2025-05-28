@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface RegisterModalProps {
@@ -21,7 +21,6 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
     email: "",
     password: "",
     confirmPassword: "",
-    role: "",
     school: "",
     grade: ""
   });
@@ -45,7 +44,6 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
       const userData = {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        role: formData.role,
         school: formData.school,
         grade: formData.grade
       };
@@ -60,7 +58,6 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
         email: "",
         password: "",
         confirmPassword: "",
-        role: "",
         school: "",
         grade: ""
       });
@@ -118,48 +115,31 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="role">I am a</Label>
-            <Select value={formData.role} onValueChange={(value) => handleInputChange("role", value)} required>
+            <Label htmlFor="school">School/Institution</Label>
+            <Input
+              id="school"
+              placeholder="e.g., Addis Ababa University"
+              value={formData.school}
+              onChange={(e) => handleInputChange("school", e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="grade">Grade/Level</Label>
+            <Select value={formData.grade} onValueChange={(value) => handleInputChange("grade", value)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select your role" />
+                <SelectValue placeholder="Select your grade" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="student">Student</SelectItem>
-                <SelectItem value="teacher">Teacher</SelectItem>
-                <SelectItem value="admin">Administrator</SelectItem>
+                <SelectItem value="grade-9">Grade 9</SelectItem>
+                <SelectItem value="grade-10">Grade 10</SelectItem>
+                <SelectItem value="grade-11">Grade 11</SelectItem>
+                <SelectItem value="grade-12">Grade 12</SelectItem>
+                <SelectItem value="university">University</SelectItem>
+                <SelectItem value="adult">Adult Learner</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          
-          {formData.role === "student" && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="school">School/Institution</Label>
-                <Input
-                  id="school"
-                  placeholder="e.g., Addis Ababa University"
-                  value={formData.school}
-                  onChange={(e) => handleInputChange("school", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="grade">Grade/Level</Label>
-                <Select value={formData.grade} onValueChange={(value) => handleInputChange("grade", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your grade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="grade-9">Grade 9</SelectItem>
-                    <SelectItem value="grade-10">Grade 10</SelectItem>
-                    <SelectItem value="grade-11">Grade 11</SelectItem>
-                    <SelectItem value="grade-12">Grade 12</SelectItem>
-                    <SelectItem value="university">University</SelectItem>
-                    <SelectItem value="adult">Adult Learner</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
           
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>

@@ -16,19 +16,19 @@ import {
   TrendingUp,
   MessageSquare,
   Users,
-  Award
+  Award,
+  LogOut
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const StudentDashboard = () => {
-  const [selectedTab, setSelectedTab] = useState("overview");
-  const { user, loading } = useAuth();
+  const { user, userRole, loading, signOut } = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && (!user || (userRole !== 'student' && userRole !== null))) {
       window.location.href = "/";
     }
-  }, [user, loading]);
+  }, [user, userRole, loading]);
 
   // Show loading while checking authentication
   if (loading) {
@@ -42,8 +42,8 @@ const StudentDashboard = () => {
     );
   }
 
-  // Redirect if not authenticated (this shouldn't show due to useEffect, but safety check)
-  if (!user) {
+  // Redirect if not authenticated or wrong role
+  if (!user || (userRole !== 'student' && userRole !== null)) {
     return null;
   }
 
@@ -134,9 +134,12 @@ const StudentDashboard = () => {
             <Button variant="ghost" size="sm">
               <Bell className="h-5 w-5" />
             </Button>
+            <Button variant="ghost" size="sm" onClick={signOut}>
+              <LogOut className="h-5 w-5" />
+            </Button>
             <Avatar>
               <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>AT</AvatarFallback>
+              <AvatarFallback>ST</AvatarFallback>
             </Avatar>
           </div>
         </div>

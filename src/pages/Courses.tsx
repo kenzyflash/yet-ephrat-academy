@@ -8,6 +8,7 @@ import { BookOpen, Search, Star, Clock, Users, Play, Filter } from "lucide-react
 import { useAuth } from "@/contexts/AuthContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
+import Footer from "@/components/Footer";
 
 const Courses = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -334,6 +335,8 @@ const Courses = () => {
         onOpenChange={setShowRegister}
         onSwitchToLogin={handleSwitchToLogin}
       />
+      
+      <Footer />
     </div>
   );
 };

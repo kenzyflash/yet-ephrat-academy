@@ -1,13 +1,13 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { BookOpen, Mail, Phone, MapPin, Send } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BookOpen, Mail, Phone, MapPin, Clock, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import Footer from "@/components/Footer";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -19,9 +19,8 @@ const Contact = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,22 +35,50 @@ const Contact = () => {
       if (error) throw error;
 
       toast({
-        title: "Message Sent!",
-        description: "Thank you for contacting us. We'll get back to you soon.",
+        title: "Message sent successfully!",
+        description: "We'll get back to you within 24 hours.",
       });
 
-      setFormData({ name: "", email: "", subject: "", message: "" });
-    } catch (error) {
-      console.error('Error submitting contact form:', error);
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        subject: "",
+        message: ""
+      });
+    } catch (error: any) {
       toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
+        title: "Failed to send message",
+        description: error.message,
+        variant: "destructive"
       });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const contactInfo = [
+    {
+      icon: MapPin,
+      title: "Visit Us",
+      details: ["Addis Ababa, Ethiopia", "Bole Atlas Area"]
+    },
+    {
+      icon: Phone,
+      title: "Call Us",
+      details: ["+251 11 123 4567", "+251 91 234 5678"]
+    },
+    {
+      icon: Mail,
+      title: "Email Us",
+      details: ["info@ethiolearn.com", "support@ethiolearn.com"]
+    },
+    {
+      icon: Clock,
+      title: "Office Hours",
+      details: ["Mon - Fri: 8:00 AM - 6:00 PM", "Sat: 9:00 AM - 2:00 PM"]
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
@@ -81,7 +108,7 @@ const Contact = () => {
             Get in Touch
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Have questions about our courses or need support? We're here to help you on your learning journey.
+            Have questions about our courses or need support? We're here to help you succeed in your learning journey.
           </p>
         </div>
 
@@ -89,68 +116,78 @@ const Contact = () => {
           {/* Contact Form */}
           <Card className="bg-white/80 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-2xl text-gray-800">Send us a Message</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Send className="h-6 w-6 text-emerald-600" />
+                Send us a message
+              </CardTitle>
               <CardDescription>
                 Fill out the form below and we'll get back to you as soon as possible.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
+                    <label htmlFor="name" className="text-sm font-medium text-gray-700">
+                      Full Name *
+                    </label>
                     <Input
                       id="name"
-                      name="name"
+                      placeholder="Abebe Tadesse"
                       value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Your full name"
+                      onChange={(e) => handleInputChange("name", e.target.value)}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                      Email Address *
+                    </label>
                     <Input
                       id="email"
-                      name="email"
                       type="email"
+                      placeholder="abebe@example.com"
                       value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="your.email@example.com"
+                      onChange={(e) => handleInputChange("email", e.target.value)}
                       required
                     />
                   </div>
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
+                  <label htmlFor="subject" className="text-sm font-medium text-gray-700">
+                    Subject *
+                  </label>
                   <Input
                     id="subject"
-                    name="subject"
+                    placeholder="How can we help you?"
                     value={formData.subject}
-                    onChange={handleInputChange}
-                    placeholder="What is your inquiry about?"
+                    onChange={(e) => handleInputChange("subject", e.target.value)}
                     required
                   />
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="message">Message</Label>
+                  <label htmlFor="message" className="text-sm font-medium text-gray-700">
+                    Message *
+                  </label>
                   <Textarea
                     id="message"
-                    name="message"
-                    value={formData.message}
-                    onChange={handleInputChange}
                     placeholder="Tell us more about your inquiry..."
                     rows={6}
+                    value={formData.message}
+                    onChange={(e) => handleInputChange("message", e.target.value)}
                     required
                   />
                 </div>
+                
                 <Button 
                   type="submit" 
-                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-3"
                   disabled={isSubmitting}
                 >
-                  <Send className="mr-2 h-4 w-4" />
                   {isSubmitting ? "Sending..." : "Send Message"}
+                  <Send className="ml-2 h-5 w-5" />
                 </Button>
               </form>
             </CardContent>
@@ -158,69 +195,58 @@ const Contact = () => {
 
           {/* Contact Information */}
           <div className="space-y-8">
-            <Card className="bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-2xl text-gray-800">Contact Information</CardTitle>
-                <CardDescription>
-                  Reach out to us through any of these channels.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center space-x-4">
-                  <div className="bg-emerald-100 rounded-full p-3">
-                    <Mail className="h-6 w-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Email</h3>
-                    <p className="text-gray-600">support@ethiolearn.com</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="bg-blue-100 rounded-full p-3">
-                    <Phone className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Phone</h3>
-                    <p className="text-gray-600">+251 11 123 4567</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="bg-purple-100 rounded-full p-3">
-                    <MapPin className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800">Address</h3>
-                    <p className="text-gray-600">
-                      Bole Road, Addis Ababa<br />
-                      Ethiopia
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Contact Information</h2>
+              <p className="text-gray-600 mb-8">
+                We're always happy to help! Reach out to us through any of the following channels.
+              </p>
+            </div>
 
+            <div className="grid grid-cols-1 gap-6">
+              {contactInfo.map((info, index) => (
+                <Card key={index} className="bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start space-x-4">
+                      <div className="bg-emerald-100 p-3 rounded-lg">
+                        <info.icon className="h-6 w-6 text-emerald-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-800 mb-2">{info.title}</h3>
+                        {info.details.map((detail, i) => (
+                          <p key={i} className="text-gray-600">{detail}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* FAQ Section */}
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-xl text-gray-800">Frequently Asked Questions</CardTitle>
+                <CardTitle>Frequently Asked Questions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-gray-800 mb-2">How do I enroll in a course?</h4>
-                  <p className="text-gray-600 text-sm">Simply create an account and click "Enroll Now" on any course page.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">How do I enroll in a course?</h4>
+                  <p className="text-sm text-gray-600">Simply create an account and browse our course catalog to get started.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-800 mb-2">Are the courses free?</h4>
-                  <p className="text-gray-600 text-sm">We offer both free and paid courses. Check individual course pages for pricing.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">Are certificates provided?</h4>
+                  <p className="text-sm text-gray-600">Yes, you'll receive a certificate upon successful completion of any course.</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-800 mb-2">Do I get a certificate?</h4>
-                  <p className="text-gray-600 text-sm">Yes, you'll receive a certificate upon successful completion of any course.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">What payment methods do you accept?</h4>
+                  <p className="text-sm text-gray-600">We accept various payment methods including mobile money and bank transfers.</p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
+
+      <Footer />
     </div>
   );
 };
