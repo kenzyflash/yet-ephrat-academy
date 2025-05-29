@@ -1,8 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { 
   BookOpen, 
@@ -12,16 +10,18 @@ import {
   BarChart3,
   UserCheck,
   GraduationCap,
-  TrendingUp,
-  LogOut
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import ProfileDropdown from "@/components/ProfileDropdown";
 
 const AdminDashboard = () => {
-  const { user, userRole, loading, signOut } = useAuth();
+  const { user, userRole, loading } = useAuth();
 
   useEffect(() => {
+    console.log('AdminDashboard - user:', user?.email, 'role:', userRole, 'loading:', loading);
     if (!loading && (!user || userRole !== 'admin')) {
+      console.log('Redirecting to home - not admin');
       window.location.href = "/";
     }
   }, [user, userRole, loading]);
@@ -71,13 +71,7 @@ const AdminDashboard = () => {
             <Button variant="ghost" size="sm">
               <Settings className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="h-5 w-5" />
-            </Button>
-            <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>A</AvatarFallback>
-            </Avatar>
+            <ProfileDropdown />
           </div>
         </div>
       </header>

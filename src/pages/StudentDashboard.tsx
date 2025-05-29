@@ -16,10 +16,10 @@ import {
   TrendingUp,
   MessageSquare,
   Users,
-  Award,
-  LogOut
+  Award
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import ProfileDropdown from "@/components/ProfileDropdown";
 
 const StudentDashboard = () => {
   const { user, userRole, loading, signOut } = useAuth();
@@ -134,13 +134,7 @@ const StudentDashboard = () => {
             <Button variant="ghost" size="sm">
               <Bell className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="h-5 w-5" />
-            </Button>
-            <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>ST</AvatarFallback>
-            </Avatar>
+            <ProfileDropdown />
           </div>
         </div>
       </header>
