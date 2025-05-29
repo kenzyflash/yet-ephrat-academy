@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import CourseSearch from "@/components/CourseSearch";
+import Footer from "@/components/Footer";
 
 const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -364,6 +365,8 @@ const Index = () => {
         onOpenChange={setShowRegister}
         onSwitchToLogin={handleSwitchToLogin}
       />
+      
+      <Footer />
     </div>
   );
 };

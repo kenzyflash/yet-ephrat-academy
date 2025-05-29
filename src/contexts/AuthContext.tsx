@@ -50,6 +50,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const role = data?.role || 'student';
       console.log('Fetched role:', role);
       setUserRole(role);
+      
+      // Redirect based on role after successful login
+      setTimeout(() => {
+        if (role === 'admin') {
+          window.location.href = "/admin-dashboard";
+        } else if (role === 'teacher') {
+          window.location.href = "/teacher-dashboard";
+        } else {
+          window.location.href = "/student-dashboard";
+        }
+      }, 100);
     } catch (error) {
       console.error('Error fetching user role:', error);
       setUserRole('student');
@@ -70,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session?.user && event === 'SIGNED_IN') {
           // Fetch user role when user is authenticated
           setTimeout(() => {
             fetchUserRole(session.user.id);
@@ -154,6 +165,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       setUserRole(null);
+      window.location.href = "/";
       toast({
         title: "Signed out",
         description: "You have been logged out successfully.",
