@@ -39,14 +39,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('user_id', userId)
         .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user role:', error);
         return;
       }
 
-      setUserRole(data?.role || null);
+      setUserRole(data?.role || 'student');
     } catch (error) {
       console.error('Error fetching user role:', error);
+      setUserRole('student');
     }
   };
 
