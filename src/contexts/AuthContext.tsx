@@ -31,17 +31,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   const { toast } = useToast();
 
   const cleanupAuthState = () => {
-    // Clear all auth-related data from localStorage
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
         localStorage.removeItem(key);
       }
     });
     
-    // Clear sessionStorage as well
     Object.keys(sessionStorage || {}).forEach((key) => {
       if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
         sessionStorage.removeItem(key);
@@ -50,7 +49,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const fetchUserRole = async (userId: string, shouldRedirect: boolean = false) => {
-    // Don't fetch role if we're in the process of signing out
     if (isSigningOut) return;
     
     try {
@@ -71,8 +69,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Fetched role:', role);
       setUserRole(role);
       
-      // Only redirect if explicitly requested (during login) and not already on correct dashboard
-      if (shouldRedirect && !isSigningOut) {
+      // Only redirect once and only if explicitly requested (during login)
+      if (shouldRedirect && !isSigningOut && !hasRedirected) {
+        setHasRedirected(true);
         const currentPath = window.location.pathname;
         let targetPath = '';
         
@@ -86,6 +85,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Only redirect if not already on the correct dashboard
         if (currentPath !== targetPath) {
+          console.log(`Redirecting from ${currentPath} to ${targetPath}`);
           setTimeout(() => {
             window.location.href = targetPath;
           }, 100);
@@ -106,32 +106,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         
-        // Handle sign out events
         if (event === 'SIGNED_OUT' || !session) {
           setSession(null);
           setUser(null);
           setUserRole(null);
           setLoading(false);
+          setHasRedirected(false);
           return;
         }
         
-        // Don't process other events if we're signing out
         if (isSigningOut) return;
         
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Only redirect on SIGNED_IN event (actual login), not on session restoration
-          const shouldRedirect = event === 'SIGNED_IN';
-          setTimeout(() => {
-            fetchUserRole(session.user.id, shouldRedirect);
-          }, 0);
+          // Only redirect on SIGNED_IN event and reset redirect flag
+          if (event === 'SIGNED_IN') {
+            setHasRedirected(false);
+            setTimeout(() => {
+              fetchUserRole(session.user.id, true);
+            }, 0);
+          } else {
+            // For other events like TOKEN_REFRESHED, just fetch role without redirect
+            setTimeout(() => {
+              fetchUserRole(session.user.id, false);
+            }, 0);
+          }
         } else {
           setUserRole(null);
         }
@@ -140,14 +145,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user && !isSigningOut) {
-        // Don't redirect on initial session load
         fetchUserRole(session.user.id, false);
       }
       
@@ -185,6 +188,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      setHasRedirected(false); // Reset redirect flag before sign in
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -210,21 +214,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('Starting sign out process...');
       
-      // Set signing out flag to prevent role fetching
       setIsSigningOut(true);
-      
-      // Clear local state immediately
       setUserRole(null);
       setUser(null);
       setSession(null);
+      setHasRedirected(false);
       
-      // Clean up auth state from storage
       cleanupAuthState();
       
-      // Attempt to sign out from Supabase
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       
-      // Don't throw error for missing sessions - user is already signed out
       if (error && 
           !error.message.includes('session_not_found') && 
           !error.message.includes('Auth session missing') &&
@@ -240,7 +239,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "You have been logged out successfully.",
       });
       
-      // Navigate to home page with a slight delay to ensure state is cleared
       setTimeout(() => {
         window.location.href = "/";
       }, 100);
@@ -248,10 +246,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error: any) {
       console.error('Sign out error:', error);
       
-      // Still clear state and navigate even if there's an error
       setUserRole(null);
       setUser(null);
       setSession(null);
+      setHasRedirected(false);
       cleanupAuthState();
       
       toast({
@@ -259,7 +257,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "You have been logged out.",
       });
       
-      // Navigate to home page
       setTimeout(() => {
         window.location.href = "/";
       }, 100);

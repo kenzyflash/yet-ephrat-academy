@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,8 @@ import {
   TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import ProfileDropdown from "@/components/ProfileDropdown";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardStats from "@/components/dashboard/DashboardStats";
 
 const AdminDashboard = () => {
   const { user, userRole, loading } = useAuth();
@@ -57,56 +59,18 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <BookOpen className="h-8 w-8 text-emerald-600" />
-            <h1 className="text-2xl font-bold text-gray-800">EthioLearn - Admin</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm">
-              <Bell className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <Settings className="h-5 w-5" />
-            </Button>
-            <ProfileDropdown />
-          </div>
-        </div>
-      </header>
+      <DashboardHeader title="EthioLearn - Admin" showSettings />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Administrator Dashboard</h1>
           <p className="text-gray-600">Monitor and manage the EthioLearn platform.</p>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {systemStats.map((stat, index) => (
-            <Card key={index} className="bg-white/80 backdrop-blur-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-                    <div className="flex items-center mt-1">
-                      <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                      <span className="text-xs text-green-500">{stat.change}</span>
-                    </div>
-                  </div>
-                  <stat.icon className={`h-8 w-8 ${stat.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DashboardStats stats={systemStats} />
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - System Management */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
@@ -169,7 +133,6 @@ const AdminDashboard = () => {
             </Card>
           </div>
 
-          {/* Right Column - Recent Activities */}
           <div className="space-y-6">
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,10 +11,12 @@ import {
   Plus,
   MessageSquare,
   BarChart3,
-  Clock
+  Clock,
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import ProfileDropdown from "@/components/ProfileDropdown";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardStats from "@/components/dashboard/DashboardStats";
 
 const TeacherDashboard = () => {
   const { user, userRole, loading } = useAuth();
@@ -38,6 +41,13 @@ const TeacherDashboard = () => {
   if (!user || userRole !== 'teacher') {
     return null;
   }
+
+  const teacherStats = [
+    { label: "My Courses", value: "2", icon: BookOpen, color: "text-blue-600" },
+    { label: "Total Students", value: "2,090", icon: Users, color: "text-green-600" },
+    { label: "Avg. Completion", value: "72%", icon: BarChart3, color: "text-purple-600" },
+    { label: "Next Class", value: "2h", icon: Clock, color: "text-orange-600" }
+  ];
 
   const teacherCourses = [
     {
@@ -66,79 +76,15 @@ const TeacherDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <BookOpen className="h-8 w-8 text-emerald-600" />
-            <h1 className="text-2xl font-bold text-gray-800">EthioLearn - Teacher</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm">
-              <Bell className="h-5 w-5" />
-            </Button>
-            <ProfileDropdown />
-          </div>
-        </div>
-      </header>
+      <DashboardHeader title="EthioLearn - Teacher" />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, Teacher!</h1>
           <p className="text-gray-600">Manage your courses and connect with your students.</p>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">My Courses</p>
-                  <p className="text-2xl font-bold text-gray-800">2</p>
-                </div>
-                <BookOpen className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Students</p>
-                  <p className="text-2xl font-bold text-gray-800">2,090</p>
-                </div>
-                <Users className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Avg. Completion</p>
-                  <p className="text-2xl font-bold text-gray-800">72%</p>
-                </div>
-                <BarChart3 className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Next Class</p>
-                  <p className="text-2xl font-bold text-gray-800">2h</p>
-                </div>
-                <Clock className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <DashboardStats stats={teacherStats} />
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
