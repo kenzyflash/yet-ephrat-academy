@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserRole = async (userId: string, shouldRedirect: boolean = false) => {
     try {
       console.log('Fetching role for user:', userId);
       const { data, error } = await supabase
@@ -51,16 +51,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Fetched role:', role);
       setUserRole(role);
       
-      // Redirect based on role after successful login
-      setTimeout(() => {
+      // Only redirect if explicitly requested (during login) and not already on correct dashboard
+      if (shouldRedirect) {
+        const currentPath = window.location.pathname;
+        let targetPath = '';
+        
         if (role === 'admin') {
-          window.location.href = "/admin-dashboard";
+          targetPath = '/admin-dashboard';
         } else if (role === 'teacher') {
-          window.location.href = "/teacher-dashboard";
+          targetPath = '/teacher-dashboard';
         } else {
-          window.location.href = "/student-dashboard";
+          targetPath = '/student-dashboard';
         }
-      }, 100);
+        
+        // Only redirect if not already on the correct dashboard
+        if (currentPath !== targetPath) {
+          setTimeout(() => {
+            window.location.href = targetPath;
+          }, 100);
+        }
+      }
     } catch (error) {
       console.error('Error fetching user role:', error);
       setUserRole('student');
@@ -69,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshUserRole = async () => {
     if (user) {
-      await fetchUserRole(user.id);
+      await fetchUserRole(user.id, false);
     }
   };
 
@@ -81,10 +91,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user && event === 'SIGNED_IN') {
-          // Fetch user role when user is authenticated
+        if (session?.user) {
+          // Only redirect on SIGNED_IN event (actual login), not on session restoration
+          const shouldRedirect = event === 'SIGNED_IN';
           setTimeout(() => {
-            fetchUserRole(session.user.id);
+            fetchUserRole(session.user.id, shouldRedirect);
           }, 0);
         } else {
           setUserRole(null);
@@ -101,7 +112,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        // Don't redirect on initial session load
+        fetchUserRole(session.user.id, false);
       }
       
       setLoading(false);
