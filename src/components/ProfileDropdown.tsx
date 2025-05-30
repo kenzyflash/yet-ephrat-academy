@@ -36,7 +36,12 @@ const ProfileDropdown = () => {
         .eq('id', user.id)
         .single();
 
-      if (data && data.avatar_url) {
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      if (data?.avatar_url) {
         setAvatarUrl(data.avatar_url);
       }
     } catch (error) {
