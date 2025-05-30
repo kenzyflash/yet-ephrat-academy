@@ -1,4 +1,6 @@
+
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -19,16 +21,43 @@ import {
   Award
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import ProfileDropdown from "@/components/ProfileDropdown";
 
 const StudentDashboard = () => {
   const { user, userRole, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     if (!loading && (!user || (userRole !== 'student' && userRole !== null))) {
       window.location.href = "/";
     }
   }, [user, userRole, loading]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (data) {
+        setUserProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   // Show loading while checking authentication
   if (loading) {
@@ -49,7 +78,7 @@ const StudentDashboard = () => {
 
   const enrolledCourses = [
     {
-      id: 1,
+      id: "ethiopian-history",
       title: "Ethiopian History and Culture",
       instructor: "Dr. Alemayehu Tadesse",
       progress: 65,
@@ -60,7 +89,7 @@ const StudentDashboard = () => {
       image: "/placeholder.svg"
     },
     {
-      id: 2,
+      id: "mathematics",
       title: "Mathematics for High School",
       instructor: "Prof. Meron Asefa",
       progress: 40,
@@ -71,7 +100,7 @@ const StudentDashboard = () => {
       image: "/placeholder.svg"
     },
     {
-      id: 3,
+      id: "english-language",
       title: "English Language Mastery",
       instructor: "Teacher Sarah Johnson",
       progress: 80,
@@ -121,6 +150,27 @@ const StudentDashboard = () => {
     { label: "Current Streak", value: "5 days", icon: TrendingUp, color: "text-orange-600" }
   ];
 
+  const handleContinueCourse = (courseId: string) => {
+    navigate(`/course/${courseId}`);
+  };
+
+  const getDisplayName = () => {
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name} ${userProfile.last_name}`;
+    }
+    return user?.email?.split('@')[0] || 'Student';
+  };
+
+  const getInitials = () => {
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return "U";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
       {/* Header */}
@@ -141,9 +191,15 @@ const StudentDashboard = () => {
 
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {user.email?.split('@')[0] || 'Student'}!</h1>
-          <p className="text-gray-600">Ready to continue your learning journey today?</p>
+        <div className="mb-8 flex items-center gap-4">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={userProfile?.avatar_url} alt="Profile" />
+            <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, {getDisplayName()}!</h1>
+            <p className="text-gray-600">Ready to continue your learning journey today?</p>
+          </div>
         </div>
 
         {/* Stats Overview */}
@@ -203,7 +259,11 @@ const StudentDashboard = () => {
                           <div className="text-sm text-gray-600">
                             <span className="font-medium">Next:</span> {course.nextLesson}
                           </div>
-                          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                          <Button 
+                            size="sm" 
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => handleContinueCourse(course.id)}
+                          >
                             <Play className="mr-1 h-4 w-4" />
                             Continue
                           </Button>

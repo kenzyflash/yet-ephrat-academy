@@ -173,20 +173,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
+      // Clear local state first
       setUserRole(null);
+      setUser(null);
+      setSession(null);
+      
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      // Don't throw error if session is already missing
+      if (error && !error.message.includes('session_not_found') && !error.message.includes('Auth session missing')) {
+        throw error;
+      }
+
+      // Navigate to home page
       window.location.href = "/";
+      
       toast({
         title: "Signed out",
         description: "You have been logged out successfully.",
       });
     } catch (error: any) {
+      // Still navigate to home even if there's an error
+      window.location.href = "/";
+      
       toast({
-        title: "Sign out failed",
-        description: error.message,
-        variant: "destructive"
+        title: "Signed out",
+        description: "You have been logged out.",
       });
     }
   };

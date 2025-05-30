@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Upload } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -17,12 +19,14 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
     email: '',
     school: '',
-    grade: ''
+    grade: '',
+    avatar_url: ''
   });
 
   useEffect(() => {
@@ -52,11 +56,54 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
           last_name: data.last_name || '',
           email: data.email || user.email || '',
           school: data.school || '',
-          grade: data.grade || ''
+          grade: data.grade || '',
+          avatar_url: data.avatar_url || ''
         });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    }
+  };
+
+  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+
+      if (!event.target.files || event.target.files.length === 0) {
+        throw new Error('You must select an image to upload.');
+      }
+
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      setProfile({ ...profile, avatar_url: publicUrl });
+
+      toast({
+        title: "Avatar uploaded",
+        description: "Your profile picture has been uploaded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -72,6 +119,7 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
           last_name: profile.last_name,
           school: profile.school,
           grade: profile.grade,
+          avatar_url: profile.avatar_url,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -116,6 +164,16 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
     }
   };
 
+  const getInitials = () => {
+    if (profile.first_name && profile.last_name) {
+      return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return "U";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -123,6 +181,31 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
           <DialogTitle>Profile Settings</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="flex flex-col items-center gap-4">
+            <Avatar className="h-24 w-24">
+              <AvatarImage src={profile.avatar_url} alt="Profile" />
+              <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col items-center gap-2">
+              <Label htmlFor="avatar" className="cursor-pointer">
+                <Button variant="outline" size="sm" disabled={uploading} asChild>
+                  <span>
+                    <Upload className="mr-2 h-4 w-4" />
+                    {uploading ? 'Uploading...' : 'Upload Photo'}
+                  </span>
+                </Button>
+              </Label>
+              <Input
+                id="avatar"
+                type="file"
+                accept="image/*"
+                onChange={uploadAvatar}
+                disabled={uploading}
+                className="hidden"
+              />
+            </div>
+          </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="first_name">First Name</Label>
