@@ -30,9 +30,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { toast } = useToast();
 
+  const cleanupAuthState = () => {
+    // Clear all auth-related data from localStorage
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    // Clear sessionStorage as well
+    Object.keys(sessionStorage || {}).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  };
+
   const fetchUserRole = async (userId: string, shouldRedirect: boolean = false) => {
+    // Don't fetch role if we're in the process of signing out
+    if (isSigningOut) return;
+    
     try {
       console.log('Fetching role for user:', userId);
       const { data, error } = await supabase
@@ -52,7 +72,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUserRole(role);
       
       // Only redirect if explicitly requested (during login) and not already on correct dashboard
-      if (shouldRedirect) {
+      if (shouldRedirect && !isSigningOut) {
         const currentPath = window.location.pathname;
         let targetPath = '';
         
@@ -73,12 +93,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (error) {
       console.error('Error fetching user role:', error);
-      setUserRole('student');
+      if (!isSigningOut) {
+        setUserRole('student');
+      }
     }
   };
 
   const refreshUserRole = async () => {
-    if (user) {
+    if (user && !isSigningOut) {
       await fetchUserRole(user.id, false);
     }
   };
@@ -88,6 +110,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
+        
+        // Handle sign out events
+        if (event === 'SIGNED_OUT' || !session) {
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Don't process other events if we're signing out
+        if (isSigningOut) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -111,7 +146,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
-      if (session?.user) {
+      if (session?.user && !isSigningOut) {
         // Don't redirect on initial session load
         fetchUserRole(session.user.id, false);
       }
@@ -120,7 +155,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isSigningOut]);
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
@@ -173,34 +208,63 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      // Clear local state first
+      console.log('Starting sign out process...');
+      
+      // Set signing out flag to prevent role fetching
+      setIsSigningOut(true);
+      
+      // Clear local state immediately
       setUserRole(null);
       setUser(null);
       setSession(null);
       
-      // Attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      // Clean up auth state from storage
+      cleanupAuthState();
       
-      // Don't throw error if session is already missing
-      if (error && !error.message.includes('session_not_found') && !error.message.includes('Auth session missing')) {
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      
+      // Don't throw error for missing sessions - user is already signed out
+      if (error && 
+          !error.message.includes('session_not_found') && 
+          !error.message.includes('Auth session missing') &&
+          !error.message.includes('session id') &&
+          !error.message.includes("doesn't exist")) {
         throw error;
       }
 
-      // Navigate to home page
-      window.location.href = "/";
+      console.log('Sign out completed, navigating to home...');
       
       toast({
         title: "Signed out",
         description: "You have been logged out successfully.",
       });
+      
+      // Navigate to home page with a slight delay to ensure state is cleared
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 100);
+      
     } catch (error: any) {
-      // Still navigate to home even if there's an error
-      window.location.href = "/";
+      console.error('Sign out error:', error);
+      
+      // Still clear state and navigate even if there's an error
+      setUserRole(null);
+      setUser(null);
+      setSession(null);
+      cleanupAuthState();
       
       toast({
         title: "Signed out",
         description: "You have been logged out.",
       });
+      
+      // Navigate to home page
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 100);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
