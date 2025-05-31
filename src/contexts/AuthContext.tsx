@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,8 +31,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [hasRedirected, setHasRedirected] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [redirectTimeout, setRedirectTimeout] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const cleanupAuthState = () => {
@@ -63,6 +63,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const shouldRedirectToDashboard = (currentPath: string, role: string) => {
     const targetPath = getDashboardPath(role);
     
+    // Don't redirect if we're already on the correct dashboard
+    if (currentPath === targetPath) {
+      return null;
+    }
+    
     // If we're on the home page and have a role, redirect to dashboard
     if (currentPath === '/' && role) {
       return targetPath;
@@ -76,8 +81,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return null;
   };
 
+  const performRedirect = (path: string) => {
+    console.log(`Redirecting to: ${path}`);
+    
+    // Clear any existing timeout
+    if (redirectTimeout) {
+      clearTimeout(redirectTimeout);
+    }
+    
+    // Set a new timeout for redirect
+    const timeout = setTimeout(() => {
+      window.location.href = path;
+    }, 100);
+    
+    setRedirectTimeout(timeout);
+  };
+
   const fetchUserRole = async (userId: string, shouldRedirect: boolean = false) => {
-    if (isSigningOut || isRedirecting) return;
+    if (isSigningOut) return;
     
     try {
       console.log('Fetching role for user:', userId);
@@ -98,18 +119,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUserRole(role);
       
       // Handle redirection logic
-      if (shouldRedirect && !isSigningOut && !hasRedirected && !isRedirecting) {
+      if (shouldRedirect && !isSigningOut) {
         const currentPath = window.location.pathname;
         const redirectPath = shouldRedirectToDashboard(currentPath, role);
         
         if (redirectPath) {
-          console.log(`Redirecting from ${currentPath} to ${redirectPath}`);
-          setHasRedirected(true);
-          setIsRedirecting(true);
-          
-          setTimeout(() => {
-            window.location.href = redirectPath;
-          }, 100);
+          performRedirect(redirectPath);
         }
       }
     } catch (error) {
@@ -121,9 +136,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const refreshUserRole = async () => {
-    if (user && !isSigningOut && !isRedirecting) {
-      // Reset redirect flags when manually refreshing role
-      setHasRedirected(false);
+    if (user && !isSigningOut) {
+      // Clear any existing redirects before refreshing
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+        setRedirectTimeout(null);
+      }
       await fetchUserRole(user.id, true);
     }
   };
@@ -138,21 +156,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(null);
           setUserRole(null);
           setLoading(false);
-          setHasRedirected(false);
-          setIsRedirecting(false);
+          // Clear any pending redirects
+          if (redirectTimeout) {
+            clearTimeout(redirectTimeout);
+            setRedirectTimeout(null);
+          }
           return;
         }
         
-        if (isSigningOut || isRedirecting) return;
+        if (isSigningOut) return;
         
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Only redirect on SIGNED_IN event and reset redirect flags
+          // Only redirect on SIGNED_IN event or when explicitly refreshing role
           if (event === 'SIGNED_IN') {
-            setHasRedirected(false);
-            setIsRedirecting(false);
             setTimeout(() => {
               fetchUserRole(session.user.id, true);
             }, 0);
@@ -185,8 +204,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, [isSigningOut, isRedirecting]);
+    return () => {
+      subscription.unsubscribe();
+      // Clear any pending redirects on cleanup
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+      }
+    };
+  }, [isSigningOut]);
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
@@ -216,8 +241,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      setHasRedirected(false);
-      setIsRedirecting(false);
+      // Clear any existing redirects before signing in
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+        setRedirectTimeout(null);
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -244,11 +273,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Starting sign out process...');
       
       setIsSigningOut(true);
-      setIsRedirecting(true);
       setUserRole(null);
       setUser(null);
       setSession(null);
-      setHasRedirected(false);
+      
+      // Clear any pending redirects
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+        setRedirectTimeout(null);
+      }
       
       cleanupAuthState();
       
@@ -279,7 +312,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUserRole(null);
       setUser(null);
       setSession(null);
-      setHasRedirected(false);
       cleanupAuthState();
       
       toast({
@@ -292,7 +324,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }, 100);
     } finally {
       setIsSigningOut(false);
-      setIsRedirecting(false);
     }
   };
 
