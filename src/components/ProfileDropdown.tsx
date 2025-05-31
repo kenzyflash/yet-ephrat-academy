@@ -18,7 +18,7 @@ import ProfileSettingsModal from "./ProfileSettingsModal";
 const ProfileDropdown = () => {
   const { user, signOut } = useAuth();
   const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -41,8 +41,8 @@ const ProfileDropdown = () => {
         return;
       }
 
-      if (data?.avatar_url) {
-        setAvatarUrl(data.avatar_url);
+      if (data) {
+        setUserProfile(data);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -50,6 +50,9 @@ const ProfileDropdown = () => {
   };
 
   const getInitials = () => {
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase();
+    }
     if (user?.email) {
       return user.email.substring(0, 2).toUpperCase();
     }
@@ -57,6 +60,9 @@ const ProfileDropdown = () => {
   };
 
   const getDisplayName = () => {
+    if (userProfile?.first_name && userProfile?.last_name) {
+      return `${userProfile.first_name} ${userProfile.last_name}`;
+    }
     return user?.email?.split('@')[0] || 'User';
   };
 
@@ -66,7 +72,7 @@ const ProfileDropdown = () => {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={avatarUrl} alt="Profile" />
+              <AvatarImage src={userProfile?.avatar_url} alt="Profile" />
               <AvatarFallback>{getInitials()}</AvatarFallback>
             </Avatar>
           </Button>
