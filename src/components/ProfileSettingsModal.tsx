@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -75,14 +74,18 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
 
       const file = event.target.files[0];
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const fileName = `${Math.random()}.${fileExt}`;
+      // Use the user ID as the folder name to match RLS policy
+      const filePath = `${user?.id}/${fileName}`;
+
+      console.log('Uploading to path:', filePath);
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) {
+        console.error('Upload error:', uploadError);
         throw uploadError;
       }
 
@@ -97,6 +100,7 @@ const ProfileSettingsModal = ({ open, onOpenChange }: ProfileSettingsModalProps)
         description: "Your profile picture has been uploaded successfully.",
       });
     } catch (error: any) {
+      console.error('Upload failed:', error);
       toast({
         title: "Upload failed",
         description: error.message,
