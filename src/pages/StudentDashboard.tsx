@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ProfileDropdown from "@/components/ProfileDropdown";
 
 const StudentDashboard = () => {
-  const { user } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState<any>(null);
 
