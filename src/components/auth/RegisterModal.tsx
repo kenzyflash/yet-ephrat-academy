@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import RoleSelector from "./RoleSelector";
 
 interface RegisterModalProps {
   open: boolean;
@@ -22,7 +23,8 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
     password: "",
     confirmPassword: "",
     school: "",
-    grade: ""
+    grade: "",
+    role: "student"
   });
   const [isLoading, setIsLoading] = useState(false);
   const { signUp } = useAuth();
@@ -45,7 +47,8 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
         first_name: formData.firstName,
         last_name: formData.lastName,
         school: formData.school,
-        grade: formData.grade
+        grade: formData.grade,
+        role: formData.role
       };
 
       await signUp(formData.email, formData.password, userData);
@@ -59,7 +62,8 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
         password: "",
         confirmPassword: "",
         school: "",
-        grade: ""
+        grade: "",
+        role: "student"
       });
     } catch (error) {
       // Error is handled in the auth context
@@ -113,6 +117,11 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
               required
             />
           </div>
+
+          <RoleSelector 
+            value={formData.role} 
+            onChange={(value) => handleInputChange("role", value)} 
+          />
           
           <div className="space-y-2">
             <Label htmlFor="school">School/Institution</Label>
