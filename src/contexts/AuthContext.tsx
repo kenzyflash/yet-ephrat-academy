@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,7 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Fetch user role from the database
+  // Fetch or assign user role from the database
   const fetchUserRole = async (userId: string) => {
     try {
       console.log('Fetching role for user:', userId);
@@ -65,9 +64,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('user_id', userId)
         .single();
 
-      if (error) {
+      if (error && error.code === 'PGRST116') {
+        // No role found, let's assign one based on email
+        console.log('No role found, assigning default role based on email');
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user?.email) {
+          let defaultRole = 'student';
+          if (userData.user.email.includes('admin')) {
+            defaultRole = 'admin';
+          } else if (userData.user.email.includes('teacher')) {
+            defaultRole = 'teacher';
+          }
+
+          // Insert the role
+          const { error: insertError } = await supabase
+            .from('user_roles')
+            .insert([{ user_id: userId, role: defaultRole }]);
+
+          if (insertError) {
+            console.error('Error inserting user role:', insertError);
+            setUserRole('student');
+            return 'student';
+          }
+
+          console.log('Assigned role:', defaultRole);
+          setUserRole(defaultRole);
+          return defaultRole;
+        }
+      } else if (error) {
         console.error('Error fetching user role:', error);
-        // Default to student if no role found
         setUserRole('student');
         return 'student';
       }

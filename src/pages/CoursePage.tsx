@@ -18,12 +18,23 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileDropdown from "@/components/ProfileDropdown";
+import { useCourseProgress } from "@/hooks/useCourseProgress";
+import { useToast } from "@/hooks/use-toast";
 
 const CoursePage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const { user, userRole, loading } = useAuth();
   const [selectedLesson, setSelectedLesson] = useState(0);
+  const { toast } = useToast();
+
+  // Use the course progress hook
+  const {
+    progress,
+    markLessonComplete,
+    isLessonCompleted,
+    getCompletedLessonsCount
+  } = useCourseProgress(courseId || '');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -55,14 +66,12 @@ const CoursePage = () => {
     duration: "8 weeks",
     students: 1234,
     rating: 4.8,
-    progress: 65,
     image: "/placeholder.svg",
     lessons: [
       {
         id: 1,
         title: "Introduction to Ethiopian History",
         duration: "45 min",
-        completed: true,
         videoUrl: "#",
         description: "Overview of Ethiopian civilization and its significance in world history."
       },
@@ -70,7 +79,6 @@ const CoursePage = () => {
         id: 2,
         title: "Ancient Ethiopian Kingdoms",
         duration: "50 min",
-        completed: true,
         videoUrl: "#",
         description: "Study of the Kingdom of Aksum and other ancient Ethiopian states."
       },
@@ -78,7 +86,6 @@ const CoursePage = () => {
         id: 3,
         title: "The Zagwe Dynasty",
         duration: "40 min",
-        completed: false,
         videoUrl: "#",
         description: "Exploration of the Zagwe period and the rock churches of Lalibela."
       },
@@ -86,7 +93,6 @@ const CoursePage = () => {
         id: 4,
         title: "Medieval Ethiopia",
         duration: "55 min",
-        completed: false,
         videoUrl: "#",
         description: "The Solomonic dynasty and medieval Ethiopian society."
       },
@@ -94,7 +100,6 @@ const CoursePage = () => {
         id: 5,
         title: "Modern Ethiopian History",
         duration: "60 min",
-        completed: false,
         videoUrl: "#",
         description: "Ethiopia in the 20th and 21st centuries."
       }
@@ -102,11 +107,25 @@ const CoursePage = () => {
   };
 
   const currentLesson = course.lessons[selectedLesson];
-  const completedLessons = course.lessons.filter(lesson => lesson.completed).length;
+  const completedLessonsCount = getCompletedLessonsCount();
+  const courseProgress = progress.overallProgress;
 
   const handleLessonComplete = () => {
-    // In a real app, this would update the database
-    console.log("Lesson completed");
+    markLessonComplete(currentLesson.id);
+  };
+
+  const handleDownloadResources = () => {
+    toast({
+      title: "Resources downloading",
+      description: "Course materials are being prepared for download.",
+    });
+  };
+
+  const handleDiscussion = () => {
+    toast({
+      title: "Discussion forum",
+      description: "Opening course discussion forum...",
+    });
   };
 
   const getDashboardUrl = () => {
@@ -166,9 +185,9 @@ const CoursePage = () => {
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Course Progress</span>
-                  <span>{completedLessons}/{course.lessons.length} lessons completed</span>
+                  <span>{completedLessonsCount}/{course.lessons.length} lessons completed</span>
                 </div>
-                <Progress value={course.progress} className="h-2" />
+                <Progress value={courseProgress} className="h-2" />
               </div>
             </div>
           </div>
@@ -194,16 +213,21 @@ const CoursePage = () => {
                   <div className="flex items-center gap-4">
                     <Button 
                       onClick={handleLessonComplete}
-                      className="bg-emerald-600 hover:bg-emerald-700"
+                      disabled={isLessonCompleted(currentLesson.id)}
+                      className={`${
+                        isLessonCompleted(currentLesson.id) 
+                          ? 'bg-green-600 hover:bg-green-700' 
+                          : 'bg-emerald-600 hover:bg-emerald-700'
+                      }`}
                     >
                       <CheckCircle className="mr-2 h-4 w-4" />
-                      Mark as Complete
+                      {isLessonCompleted(currentLesson.id) ? 'Completed' : 'Mark as Complete'}
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleDownloadResources}>
                       <Download className="mr-2 h-4 w-4" />
                       Download Resources
                     </Button>
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleDiscussion}>
                       <MessageSquare className="mr-2 h-4 w-4" />
                       Discussion
                     </Button>
@@ -219,7 +243,7 @@ const CoursePage = () => {
               <CardHeader>
                 <CardTitle>Course Lessons</CardTitle>
                 <CardDescription>
-                  {completedLessons} of {course.lessons.length} lessons completed
+                  {completedLessonsCount} of {course.lessons.length} lessons completed
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -242,7 +266,7 @@ const CoursePage = () => {
                           <p className="text-xs text-gray-600">{lesson.duration}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          {lesson.completed && (
+                          {isLessonCompleted(lesson.id) && (
                             <CheckCircle className="h-4 w-4 text-emerald-600" />
                           )}
                           <Badge variant={selectedLesson === index ? "default" : "secondary"} className="text-xs">
