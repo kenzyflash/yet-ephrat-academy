@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BookOpen, 
-  Play, 
   CheckCircle, 
   Clock, 
   Users, 
@@ -18,23 +18,49 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileDropdown from "@/components/ProfileDropdown";
-import { useCourseProgress } from "@/hooks/useCourseProgress";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import VideoPlayer from "@/components/course/VideoPlayer";
+import CourseDiscussion from "@/components/course/CourseDiscussion";
+import AssignmentSubmission from "@/components/course/AssignmentSubmission";
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  instructor_name: string;
+  duration: string;
+  student_count: number;
+  rating: number;
+  image_url: string;
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description: string;
+  video_url: string;
+  duration_minutes: number;
+  order_index: number;
+}
+
+interface LessonProgress {
+  lesson_id: string;
+  completed: boolean;
+  watch_time_minutes: number;
+}
 
 const CoursePage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const { user, userRole, loading } = useAuth();
-  const [selectedLesson, setSelectedLesson] = useState(0);
   const { toast } = useToast();
-
-  // Use the course progress hook
-  const {
-    progress,
-    markLessonComplete,
-    isLessonCompleted,
-    getCompletedLessonsCount
-  } = useCourseProgress(courseId || '');
+  
+  const [course, setCourse] = useState<Course | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [selectedLesson, setSelectedLesson] = useState(0);
+  const [lessonProgress, setLessonProgress] = useState<LessonProgress[]>([]);
+  const [courseLoading, setCourseLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,7 +68,141 @@ const CoursePage = () => {
     }
   }, [user, loading, navigate]);
 
-  if (loading) {
+  useEffect(() => {
+    if (courseId && user) {
+      fetchCourseData();
+      fetchLessonProgress();
+    }
+  }, [courseId, user]);
+
+  const fetchCourseData = async () => {
+    if (!courseId) return;
+
+    try {
+      // Fetch course details
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+
+      if (courseError) throw courseError;
+      setCourse(courseData);
+
+      // Fetch lessons
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: true });
+
+      if (lessonsError) throw lessonsError;
+      setLessons(lessonsData || []);
+    } catch (error) {
+      console.error('Error fetching course data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load course data",
+        variant: "destructive"
+      });
+    } finally {
+      setCourseLoading(false);
+    }
+  };
+
+  const fetchLessonProgress = async () => {
+    if (!user || !courseId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id, completed, watch_time_minutes')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId);
+
+      if (error) throw error;
+      setLessonProgress(data || []);
+    } catch (error) {
+      console.error('Error fetching lesson progress:', error);
+    }
+  };
+
+  const updateWatchTime = async (lessonId: string, minutes: number) => {
+    if (!user || !courseId) return;
+
+    try {
+      await supabase
+        .from('lesson_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          course_id: courseId,
+          watch_time_minutes: minutes
+        });
+    } catch (error) {
+      console.error('Error updating watch time:', error);
+    }
+  };
+
+  const markLessonComplete = async (lessonId: string) => {
+    if (!user || !courseId) return;
+
+    try {
+      await supabase
+        .from('lesson_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          course_id: courseId,
+          completed: true,
+          completed_at: new Date().toISOString()
+        });
+
+      await fetchLessonProgress();
+      
+      // Log study session
+      await supabase
+        .from('study_sessions')
+        .upsert({
+          user_id: user.id,
+          date: new Date().toISOString().split('T')[0],
+          minutes_studied: supabase.sql`COALESCE(minutes_studied, 0) + ${lessons[selectedLesson]?.duration_minutes || 0}`
+        });
+
+      toast({
+        title: "Lesson completed!",
+        description: "Great job! Keep up the good work.",
+      });
+    } catch (error) {
+      console.error('Error marking lesson complete:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark lesson as complete",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const isLessonCompleted = (lessonId: string) => {
+    return lessonProgress.some(p => p.lesson_id === lessonId && p.completed);
+  };
+
+  const getCompletedLessonsCount = () => {
+    return lessonProgress.filter(p => p.completed).length;
+  };
+
+  const getCourseProgress = () => {
+    if (lessons.length === 0) return 0;
+    return Math.round((getCompletedLessonsCount() / lessons.length) * 100);
+  };
+
+  const getDashboardUrl = () => {
+    if (userRole === 'admin') return '/admin-dashboard';
+    if (userRole === 'teacher') return '/teacher-dashboard';
+    return '/student-dashboard';
+  };
+
+  if (loading || courseLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
@@ -53,86 +213,11 @@ const CoursePage = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !course) {
     return null;
   }
 
-  // Mock course data - in real app this would come from your database
-  const course = {
-    id: courseId,
-    title: "Ethiopian History and Culture",
-    instructor: "Dr. Alemayehu Tadesse",
-    description: "Explore the rich history and diverse culture of Ethiopia from ancient times to modern day.",
-    duration: "8 weeks",
-    students: 1234,
-    rating: 4.8,
-    image: "/placeholder.svg",
-    lessons: [
-      {
-        id: 1,
-        title: "Introduction to Ethiopian History",
-        duration: "45 min",
-        videoUrl: "#",
-        description: "Overview of Ethiopian civilization and its significance in world history."
-      },
-      {
-        id: 2,
-        title: "Ancient Ethiopian Kingdoms",
-        duration: "50 min",
-        videoUrl: "#",
-        description: "Study of the Kingdom of Aksum and other ancient Ethiopian states."
-      },
-      {
-        id: 3,
-        title: "The Zagwe Dynasty",
-        duration: "40 min",
-        videoUrl: "#",
-        description: "Exploration of the Zagwe period and the rock churches of Lalibela."
-      },
-      {
-        id: 4,
-        title: "Medieval Ethiopia",
-        duration: "55 min",
-        videoUrl: "#",
-        description: "The Solomonic dynasty and medieval Ethiopian society."
-      },
-      {
-        id: 5,
-        title: "Modern Ethiopian History",
-        duration: "60 min",
-        videoUrl: "#",
-        description: "Ethiopia in the 20th and 21st centuries."
-      }
-    ]
-  };
-
-  const currentLesson = course.lessons[selectedLesson];
-  const completedLessonsCount = getCompletedLessonsCount();
-  const courseProgress = progress.overallProgress;
-
-  const handleLessonComplete = () => {
-    markLessonComplete(currentLesson.id);
-  };
-
-  const handleDownloadResources = () => {
-    toast({
-      title: "Resources downloading",
-      description: "Course materials are being prepared for download.",
-    });
-  };
-
-  const handleDiscussion = () => {
-    toast({
-      title: "Discussion forum",
-      description: "Opening course discussion forum...",
-    });
-  };
-
-  const getDashboardUrl = () => {
-    if (userRole === 'admin') return '/admin-dashboard';
-    if (userRole === 'teacher') return '/teacher-dashboard';
-    return '/student-dashboard';
-  };
+  const currentLesson = lessons[selectedLesson];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
@@ -158,13 +243,13 @@ const CoursePage = () => {
         <div className="mb-8">
           <div className="flex items-start gap-6">
             <img 
-              src={course.image} 
+              src={course.image_url || "/placeholder.svg"}
               alt={course.title}
               className="w-32 h-32 rounded-lg object-cover"
             />
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-800 mb-2">{course.title}</h1>
-              <p className="text-gray-600 mb-4">by {course.instructor}</p>
+              <p className="text-gray-600 mb-4">by {course.instructor_name}</p>
               <p className="text-gray-700 mb-4">{course.description}</p>
               
               <div className="flex items-center gap-6 text-sm text-gray-600 mb-4">
@@ -174,7 +259,7 @@ const CoursePage = () => {
                 </span>
                 <span className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  {course.students.toLocaleString()} students
+                  {course.student_count?.toLocaleString()} students
                 </span>
                 <span className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -185,9 +270,9 @@ const CoursePage = () => {
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Course Progress</span>
-                  <span>{completedLessonsCount}/{course.lessons.length} lessons completed</span>
+                  <span>{getCompletedLessonsCount()}/{lessons.length} lessons completed</span>
                 </div>
-                <Progress value={courseProgress} className="h-2" />
+                <Progress value={getCourseProgress()} className="h-2" />
               </div>
             </div>
           </div>
@@ -195,60 +280,73 @@ const CoursePage = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Video Player */}
+          {/* Left Column - Video and Content */}
           <div className="lg:col-span-2">
-            <Card className="bg-white/80 backdrop-blur-sm mb-6">
-              <CardContent className="p-0">
-                <div className="aspect-video bg-gray-900 rounded-t-lg flex items-center justify-center">
-                  <div className="text-center text-white">
-                    <Play className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-lg">{currentLesson.title}</p>
-                    <p className="text-sm opacity-75">{currentLesson.duration}</p>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold mb-2">{currentLesson.title}</h2>
-                  <p className="text-gray-600 mb-4">{currentLesson.description}</p>
-                  
-                  <div className="flex items-center gap-4">
-                    <Button 
-                      onClick={handleLessonComplete}
-                      disabled={isLessonCompleted(currentLesson.id)}
-                      className={`${
-                        isLessonCompleted(currentLesson.id) 
-                          ? 'bg-green-600 hover:bg-green-700' 
-                          : 'bg-emerald-600 hover:bg-emerald-700'
-                      }`}
-                    >
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      {isLessonCompleted(currentLesson.id) ? 'Completed' : 'Mark as Complete'}
-                    </Button>
-                    <Button variant="outline" onClick={handleDownloadResources}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download Resources
-                    </Button>
-                    <Button variant="outline" onClick={handleDiscussion}>
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Discussion
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Tabs defaultValue="video" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="video">Video Lesson</TabsTrigger>
+                <TabsTrigger value="discussion">Discussion</TabsTrigger>
+                <TabsTrigger value="assignments">Assignments</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="video" className="space-y-6">
+                {currentLesson && (
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardContent className="p-0">
+                      <VideoPlayer
+                        videoUrl={currentLesson.video_url}
+                        title={currentLesson.title}
+                        duration={currentLesson.duration_minutes}
+                        onWatchTimeUpdate={(minutes) => updateWatchTime(currentLesson.id, minutes)}
+                        onComplete={() => markLessonComplete(currentLesson.id)}
+                      />
+                      
+                      <div className="p-6">
+                        <h2 className="text-xl font-semibold mb-2">{currentLesson.title}</h2>
+                        <p className="text-gray-600 mb-4">{currentLesson.description}</p>
+                        
+                        <div className="flex items-center gap-4">
+                          <Button 
+                            onClick={() => markLessonComplete(currentLesson.id)}
+                            disabled={isLessonCompleted(currentLesson.id)}
+                            className={`${
+                              isLessonCompleted(currentLesson.id) 
+                                ? 'bg-green-600 hover:bg-green-700' 
+                                : 'bg-emerald-600 hover:bg-emerald-700'
+                            }`}
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            {isLessonCompleted(currentLesson.id) ? 'Completed' : 'Mark as Complete'}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="discussion">
+                <CourseDiscussion courseId={courseId!} />
+              </TabsContent>
+
+              <TabsContent value="assignments">
+                <AssignmentSubmission courseId={courseId!} />
+              </TabsContent>
+            </Tabs>
           </div>
 
-          {/* Course Outline */}
+          {/* Right Column - Course Outline */}
           <div>
             <Card className="bg-white/80 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle>Course Lessons</CardTitle>
                 <CardDescription>
-                  {completedLessonsCount} of {course.lessons.length} lessons completed
+                  {getCompletedLessonsCount()} of {lessons.length} lessons completed
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {course.lessons.map((lesson, index) => (
+                  {lessons.map((lesson, index) => (
                     <div
                       key={lesson.id}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -263,7 +361,7 @@ const CoursePage = () => {
                           <h4 className="font-medium text-sm text-gray-800 mb-1">
                             {lesson.title}
                           </h4>
-                          <p className="text-xs text-gray-600">{lesson.duration}</p>
+                          <p className="text-xs text-gray-600">{lesson.duration_minutes} min</p>
                         </div>
                         <div className="flex items-center gap-2">
                           {isLessonCompleted(lesson.id) && (
