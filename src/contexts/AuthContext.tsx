@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // Fetch or assign user role from the database
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserRole = async (userId: string): Promise<string> => {
     try {
       console.log('Fetching role for user:', userId);
       const { data, error } = await supabase
@@ -142,6 +142,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
+    const initializeAuth = async () => {
+      try {
+        // Check for existing session first
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user && mounted) {
+          console.log('Found existing session for:', session.user.email);
+          setSession(session);
+          setUser(session.user);
+          
+          // Fetch role without redirecting on initial load
+          await fetchUserRole(session.user.id);
+        }
+        
+        if (mounted) {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
@@ -174,25 +206,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      
-      console.log('Initial session check:', session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserRole(session.user.id).then((role) => {
-          // Only redirect on initial load if we're on the home page
-          if (window.location.pathname === '/') {
-            handleRedirection(role);
-          }
-        });
-      }
-      
-      setLoading(false);
-    });
+    // Initialize auth
+    initializeAuth();
 
     return () => {
       mounted = false;

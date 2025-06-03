@@ -1,3 +1,4 @@
+
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   BookOpen, 
   Clock, 
@@ -23,6 +25,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ProfileDropdown from "@/components/ProfileDropdown";
+import CourseEnrollment from "@/components/dashboard/CourseEnrollment";
 
 const StudentDashboard = () => {
   const { user, userRole, loading } = useAuth();
@@ -219,63 +222,140 @@ const StudentDashboard = () => {
             ))}
           </div>
 
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Current Courses */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-emerald-600" />
-                    My Courses
-                  </CardTitle>
-                  <CardDescription>Continue your learning journey</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {enrolledCourses.map((course) => (
-                    <div key={course.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-start gap-4">
-                        <img 
-                          src={course.image} 
-                          alt={course.title}
-                          className="w-16 h-16 rounded-lg object-cover"
-                        />
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-800 mb-1">{course.title}</h3>
-                          <p className="text-sm text-gray-600 mb-2">by {course.instructor}</p>
-                          
-                          <div className="flex items-center gap-4 mb-3">
+          {/* Main Content with Tabs */}
+          <Tabs defaultValue="dashboard" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="courses">Browse Courses</TabsTrigger>
+              <TabsTrigger value="achievements">Achievements</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column - Current Courses */}
+                <div className="lg:col-span-2 space-y-6">
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BookOpen className="h-5 w-5 text-emerald-600" />
+                        My Courses
+                      </CardTitle>
+                      <CardDescription>Continue your learning journey</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {enrolledCourses.map((course) => (
+                        <div key={course.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-start gap-4">
+                            <img 
+                              src={course.image} 
+                              alt={course.title}
+                              className="w-16 h-16 rounded-lg object-cover"
+                            />
                             <div className="flex-1">
-                              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                                <span>Progress</span>
-                                <span>{course.completedLessons}/{course.totalLessons} lessons</span>
+                              <h3 className="font-semibold text-gray-800 mb-1">{course.title}</h3>
+                              <p className="text-sm text-gray-600 mb-2">by {course.instructor}</p>
+                              
+                              <div className="flex items-center gap-4 mb-3">
+                                <div className="flex-1">
+                                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                                    <span>Progress</span>
+                                    <span>{course.completedLessons}/{course.totalLessons} lessons</span>
+                                  </div>
+                                  <Progress value={course.progress} className="h-2" />
+                                </div>
+                                <Badge variant="secondary">{course.progress}%</Badge>
                               </div>
-                              <Progress value={course.progress} className="h-2" />
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm text-gray-600">
+                                  <span className="font-medium">Next:</span> {course.nextLesson}
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  onClick={() => handleContinueCourse(course.id)}
+                                >
+                                  <Play className="mr-1 h-4 w-4" />
+                                  Continue
+                                </Button>
+                              </div>
                             </div>
-                            <Badge variant="secondary">{course.progress}%</Badge>
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-gray-600">
-                              <span className="font-medium">Next:</span> {course.nextLesson}
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                              onClick={() => handleContinueCourse(course.id)}
-                            >
-                              <Play className="mr-1 h-4 w-4" />
-                              Continue
-                            </Button>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
 
-              {/* Achievements */}
+                {/* Right Column - Sidebar */}
+                <div className="space-y-6">
+                  {/* Upcoming Assignments */}
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-blue-600" />
+                        Upcoming Assignments
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {upcomingAssignments.map((assignment) => (
+                        <div key={assignment.id} className="p-3 border rounded-lg">
+                          <h4 className="font-medium text-gray-800 text-sm mb-1">{assignment.title}</h4>
+                          <p className="text-xs text-gray-600 mb-2">{assignment.course}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-500">Due: {assignment.dueDate}</span>
+                            <Badge variant={assignment.status === "started" ? "default" : "secondary"} className="text-xs">
+                              {assignment.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Study Goals */}
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5 text-purple-600" />
+                        Weekly Goals
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Study Time</span>
+                            <span>12/15 hours</span>
+                          </div>
+                          <Progress value={80} className="h-2" />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Lessons Completed</span>
+                            <span>8/10</span>
+                          </div>
+                          <Progress value={80} className="h-2" />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Assignments</span>
+                            <span>2/3</span>
+                          </div>
+                          <Progress value={67} className="h-2" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="courses">
+              <CourseEnrollment />
+            </TabsContent>
+
+            <TabsContent value="achievements">
               <Card className="bg-white/80 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -285,7 +365,7 @@ const StudentDashboard = () => {
                   <CardDescription>Your learning milestones</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {achievements.map((achievement) => (
                       <div 
                         key={achievement.id} 
@@ -307,98 +387,8 @@ const StudentDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Right Column - Sidebar */}
-            <div className="space-y-6">
-              {/* Upcoming Assignments */}
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-blue-600" />
-                    Upcoming Assignments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {upcomingAssignments.map((assignment) => (
-                    <div key={assignment.id} className="p-3 border rounded-lg">
-                      <h4 className="font-medium text-gray-800 text-sm mb-1">{assignment.title}</h4>
-                      <p className="text-xs text-gray-600 mb-2">{assignment.course}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">Due: {assignment.dueDate}</span>
-                        <Badge variant={assignment.status === "started" ? "default" : "secondary"} className="text-xs">
-                          {assignment.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Study Goals */}
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-purple-600" />
-                    Weekly Goals
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Study Time</span>
-                        <span>12/15 hours</span>
-                      </div>
-                      <Progress value={80} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Lessons Completed</span>
-                        <span>8/10</span>
-                      </div>
-                      <Progress value={80} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Assignments</span>
-                        <span>2/3</span>
-                      </div>
-                      <Progress value={67} className="h-2" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Community Activity */}
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-green-600" />
-                    Community
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="text-sm">
-                      <p className="font-medium text-gray-800">New Discussion</p>
-                      <p className="text-gray-600">"Help with Math Problem #15"</p>
-                      <p className="text-xs text-gray-500">Mathematics Course</p>
-                    </div>
-                    <div className="text-sm">
-                      <p className="font-medium text-gray-800">Study Group</p>
-                      <p className="text-gray-600">"Ethiopian History Study Session"</p>
-                      <p className="text-xs text-gray-500">Tomorrow, 3:00 PM</p>
-                    </div>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Join Discussions
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </ProtectedRoute>
