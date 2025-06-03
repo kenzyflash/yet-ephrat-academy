@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
 
   // Clean up any existing auth state
@@ -54,7 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Fetch or assign user role from the database
+  // Fetch user role from the database
   const fetchUserRole = async (userId: string): Promise<string> => {
     try {
       console.log('Fetching role for user:', userId);
@@ -64,35 +66,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('user_id', userId)
         .single();
 
-      if (error && error.code === 'PGRST116') {
-        // No role found, let's assign one based on email
-        console.log('No role found, assigning default role based on email');
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData.user?.email) {
-          let defaultRole: 'student' | 'teacher' | 'admin' = 'student';
-          if (userData.user.email.includes('admin')) {
-            defaultRole = 'admin';
-          } else if (userData.user.email.includes('teacher')) {
-            defaultRole = 'teacher';
-          }
-
-          // Insert the role
-          const { error: insertError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: userId, role: defaultRole });
-
-          if (insertError) {
-            console.error('Error inserting user role:', insertError);
-            setUserRole('student');
-            return 'student';
-          }
-
-          console.log('Assigned role:', defaultRole);
-          setUserRole(defaultRole);
-          return defaultRole;
-        }
-      } else if (error) {
+      if (error) {
         console.error('Error fetching user role:', error);
+        // Default to student role if no role found
         setUserRole('student');
         return 'student';
       }
@@ -113,20 +89,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const currentPath = window.location.pathname;
     const targetPath = getDashboardPath(role);
     
-    console.log('Current path:', currentPath, 'Target path:', targetPath);
+    console.log('Current path:', currentPath, 'Target path:', targetPath, 'Role:', role);
     
-    // If we're on the home page and authenticated, redirect to dashboard
-    if (currentPath === '/' && role) {
-      console.log('Redirecting from home to dashboard');
-      window.location.href = targetPath;
-      return;
-    }
-    
-    // If we're on a dashboard but it's the wrong one for our role
-    if (currentPath.includes('-dashboard') && currentPath !== targetPath) {
-      console.log('Redirecting to correct dashboard');
-      window.location.href = targetPath;
-      return;
+    // Prevent redirection loops - only redirect if we're not already on the correct page
+    if (currentPath !== targetPath) {
+      // If we're on the home page and authenticated, redirect to dashboard
+      if (currentPath === '/') {
+        console.log('Redirecting from home to dashboard');
+        setTimeout(() => {
+          window.location.href = targetPath;
+        }, 100);
+        return;
+      }
+      
+      // If we're on a dashboard but it's the wrong one for our role
+      if (currentPath.includes('-dashboard')) {
+        console.log('Redirecting to correct dashboard');
+        setTimeout(() => {
+          window.location.href = targetPath;
+        }, 100);
+        return;
+      }
     }
   };
 
@@ -134,41 +117,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshUserRole = async () => {
     if (user) {
       const role = await fetchUserRole(user.id);
-      handleRedirection(role);
+      // Only redirect if we're on the home page or wrong dashboard
+      const currentPath = window.location.pathname;
+      if (currentPath === '/' || (currentPath.includes('-dashboard') && currentPath !== getDashboardPath(role))) {
+        handleRedirection(role);
+      }
     }
   };
 
-  // Set up auth state listener
+  // Initialize authentication state
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        // Check for existing session first
-        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('Initializing auth...');
+        
+        // Get current session
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+            setInitialized(true);
+          }
           return;
         }
 
-        if (session?.user && mounted) {
-          console.log('Found existing session for:', session.user.email);
-          setSession(session);
-          setUser(session.user);
+        if (currentSession?.user && mounted) {
+          console.log('Found existing session for:', currentSession.user.email);
+          setSession(currentSession);
+          setUser(currentSession.user);
           
-          // Fetch role without redirecting on initial load
-          await fetchUserRole(session.user.id);
+          // Fetch role but don't redirect during initial load
+          await fetchUserRole(currentSession.user.id);
         }
         
         if (mounted) {
           setLoading(false);
+          setInitialized(true);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
         if (mounted) {
           setLoading(false);
+          setInitialized(true);
         }
       }
     };
@@ -191,8 +185,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
-          // Fetch role and handle redirection for sign in events
+        if (session?.user && initialized) {
+          // For sign in events after initialization, fetch role and redirect
           if (event === 'SIGNED_IN') {
             const role = await fetchUserRole(session.user.id);
             handleRedirection(role);
@@ -206,14 +200,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Initialize auth
+    // Initialize auth state
     initializeAuth();
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initialized]);
 
   const signUp = async (email: string, password: string, userData: any) => {
     try {
