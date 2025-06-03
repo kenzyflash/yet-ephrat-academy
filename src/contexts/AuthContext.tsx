@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log('No role found, assigning default role based on email');
         const { data: userData } = await supabase.auth.getUser();
         if (userData.user?.email) {
-          let defaultRole = 'student';
+          let defaultRole: 'student' | 'teacher' | 'admin' = 'student';
           if (userData.user.email.includes('admin')) {
             defaultRole = 'admin';
           } else if (userData.user.email.includes('teacher')) {
@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Insert the role
           const { error: insertError } = await supabase
             .from('user_roles')
-            .insert([{ user_id: userId, role: defaultRole }]);
+            .insert({ user_id: userId, role: defaultRole });
 
           if (insertError) {
             console.error('Error inserting user role:', insertError);
@@ -205,7 +205,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       cleanupAuthState();
       
       // Determine role based on email or explicit role
-      let role = 'student';
+      let role: 'student' | 'teacher' | 'admin' = 'student';
       if (email.includes('admin') || userData.role === 'admin') {
         role = 'admin';
       } else if (email.includes('teacher') || userData.role === 'teacher') {
