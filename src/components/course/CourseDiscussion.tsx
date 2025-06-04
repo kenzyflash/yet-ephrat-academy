@@ -39,38 +39,59 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
 
   const fetchDiscussions = async () => {
     try {
-      const { data, error } = await supabase
+      // First get discussions
+      const { data: discussionsData, error: discussionsError } = await supabase
         .from('course_discussions')
-        .select(`
-          *,
-          profiles!inner (
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .eq('course_id', courseId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (discussionsError) throw discussionsError;
+
+      if (!discussionsData || discussionsData.length === 0) {
+        setDiscussions([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get user IDs from discussions
+      const userIds = discussionsData.map(d => d.user_id);
+
+      // Get profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
 
       // Check which discussions the current user has upvoted
-      if (user && data) {
+      let upvotedIds: string[] = [];
+      if (user) {
         const { data: upvotes } = await supabase
           .from('discussion_upvotes')
           .select('discussion_id')
           .eq('user_id', user.id);
 
-        const upvotedIds = upvotes?.map(u => u.discussion_id) || [];
-        
-        const discussionsWithUpvotes = data.map(discussion => ({
-          ...discussion,
-          hasUpvoted: upvotedIds.includes(discussion.id)
-        }));
-
-        setDiscussions(discussionsWithUpvotes);
-      } else {
-        setDiscussions(data || []);
+        upvotedIds = upvotes?.map(u => u.discussion_id) || [];
       }
+
+      // Combine discussions with profiles and upvote status
+      const discussionsWithProfiles = discussionsData.map(discussion => {
+        const profile = profilesData?.find(p => p.id === discussion.user_id);
+        return {
+          ...discussion,
+          profiles: profile ? {
+            first_name: profile.first_name,
+            last_name: profile.last_name
+          } : null,
+          hasUpvoted: upvotedIds.includes(discussion.id)
+        };
+      });
+
+      setDiscussions(discussionsWithProfiles);
     } catch (error) {
       console.error('Error fetching discussions:', error);
       toast({
