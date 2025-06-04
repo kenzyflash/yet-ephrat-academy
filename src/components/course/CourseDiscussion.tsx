@@ -18,7 +18,7 @@ interface Discussion {
   profiles: {
     first_name: string;
     last_name: string;
-  };
+  } | null;
   hasUpvoted?: boolean;
 }
 
@@ -43,7 +43,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         .from('course_discussions')
         .select(`
           *,
-          profiles:user_id (
+          profiles!course_discussions_user_id_fkey (
             first_name,
             last_name
           )
@@ -129,10 +129,11 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         if (error) throw error;
 
         // Update upvote count
-        await supabase
-          .from('course_discussions')
-          .update({ upvotes: supabase.sql`upvotes - 1` })
-          .eq('id', discussionId);
+        const { error: updateError } = await supabase.rpc('decrement_upvotes', {
+          discussion_id: discussionId
+        });
+
+        if (updateError) throw updateError;
       } else {
         // Add upvote
         const { error } = await supabase
@@ -145,10 +146,11 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         if (error) throw error;
 
         // Update upvote count
-        await supabase
-          .from('course_discussions')
-          .update({ upvotes: supabase.sql`upvotes + 1` })
-          .eq('id', discussionId);
+        const { error: updateError } = await supabase.rpc('increment_upvotes', {
+          discussion_id: discussionId
+        });
+
+        if (updateError) throw updateError;
       }
 
       await fetchDiscussions();
@@ -207,13 +209,13 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
                 <div className="flex items-start gap-3">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {discussion.profiles?.first_name?.[0]}{discussion.profiles?.last_name?.[0]}
+                      {discussion.profiles?.first_name?.[0] || 'U'}{discussion.profiles?.last_name?.[0] || ''}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium text-sm">
-                        {discussion.profiles?.first_name} {discussion.profiles?.last_name}
+                        {discussion.profiles?.first_name || 'Unknown'} {discussion.profiles?.last_name || 'User'}
                       </span>
                       <span className="text-xs text-gray-500">
                         {new Date(discussion.created_at).toLocaleDateString()}

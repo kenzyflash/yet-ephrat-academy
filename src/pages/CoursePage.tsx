@@ -161,13 +161,15 @@ const CoursePage = () => {
       await fetchLessonProgress();
       
       // Log study session
-      await supabase
-        .from('study_sessions')
-        .upsert({
-          user_id: user.id,
-          date: new Date().toISOString().split('T')[0],
-          minutes_studied: supabase.sql`COALESCE(minutes_studied, 0) + ${lessons[selectedLesson]?.duration_minutes || 0}`
+      const currentLesson = lessons.find(l => l.id === lessonId);
+      if (currentLesson) {
+        const today = new Date().toISOString().split('T')[0];
+        await supabase.rpc('increment_study_minutes', {
+          p_user_id: user.id,
+          p_date: today,
+          p_minutes: currentLesson.duration_minutes
         });
+      }
 
       toast({
         title: "Lesson completed!",
