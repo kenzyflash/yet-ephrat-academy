@@ -43,7 +43,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         .from('course_discussions')
         .select(`
           *,
-          profiles!course_discussions_user_id_fkey (
+          profiles!inner (
             first_name,
             last_name
           )

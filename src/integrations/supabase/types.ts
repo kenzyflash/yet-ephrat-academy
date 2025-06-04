@@ -473,12 +473,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      decrement_upvotes: {
+        Args: { discussion_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      increment_study_minutes: {
+        Args: { p_user_id: string; p_date: string; p_minutes: number }
+        Returns: undefined
+      }
+      increment_upvotes: {
+        Args: { discussion_id: string }
+        Returns: undefined
       }
     }
     Enums: {
