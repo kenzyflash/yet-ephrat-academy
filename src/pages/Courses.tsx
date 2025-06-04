@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, Search, Star, Clock, Users, Play, Filter } from "lucide-react";
+import { BookOpen, Search, Star, Clock, Users, Play, Filter, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
@@ -20,12 +20,12 @@ const Courses = () => {
 
   const categories = [
     { value: "all", label: "All Categories" },
-    { value: "mathematics", label: "Mathematics" },
-    { value: "science", label: "Science" },
-    { value: "languages", label: "Languages" },
-    { value: "history", label: "History & Culture" },
-    { value: "technology", label: "Technology" },
-    { value: "arts", label: "Arts & Literature" }
+    { value: "workplace-safety", label: "Workplace Safety" },
+    { value: "industrial-safety", label: "Industrial Safety" },
+    { value: "fire-safety", label: "Fire Safety" },
+    { value: "health-safety", label: "Health & Safety" },
+    { value: "emergency-response", label: "Emergency Response" },
+    { value: "risk-management", label: "Risk Management" }
   ];
 
   const levels = [
@@ -38,120 +38,120 @@ const Courses = () => {
   const allCourses = [
     {
       id: 1,
-      title: "Ethiopian History and Culture",
-      instructor: "Dr. Alemayehu Tadesse",
-      category: "history",
+      title: "Workplace Safety Fundamentals",
+      instructor: "Dr. Sarah Johnson",
+      category: "workplace-safety",
       level: "Beginner",
-      duration: "8 weeks",
+      duration: "4 weeks",
       students: 1234,
       rating: 4.8,
       image: "/placeholder.svg",
       price: "Free",
-      description: "Explore the rich history and diverse culture of Ethiopia from ancient times to modern day."
+      description: "Learn essential workplace safety principles and risk assessment techniques for modern work environments."
     },
     {
       id: 2,
-      title: "Mathematics for High School",
-      instructor: "Prof. Meron Asefa",
-      category: "mathematics",
+      title: "Industrial Safety Protocols",
+      instructor: "Prof. Michael Chen",
+      category: "industrial-safety",
       level: "Intermediate",
-      duration: "12 weeks",
+      duration: "6 weeks",
       students: 2156,
       rating: 4.9,
       image: "/placeholder.svg",
-      price: "500 ETB",
-      description: "Comprehensive mathematics course covering algebra, geometry, and calculus fundamentals."
+      price: "299 USD",
+      description: "Comprehensive industrial safety course covering hazard identification and safety management systems."
     },
     {
       id: 3,
-      title: "English Language Mastery",
-      instructor: "Teacher Sarah Johnson",
-      category: "languages",
+      title: "Fire Safety and Prevention",
+      instructor: "Captain Lisa Rodriguez",
+      category: "fire-safety",
       level: "All Levels",
-      duration: "10 weeks",
+      duration: "3 weeks",
       students: 3421,
       rating: 4.7,
       image: "/placeholder.svg",
-      price: "300 ETB",
-      description: "Improve your English speaking, writing, and comprehension skills step by step."
+      price: "199 USD",
+      description: "Essential fire safety knowledge for workplace and facility fire prevention and emergency response."
     },
     {
       id: 4,
-      title: "Physics Fundamentals",
-      instructor: "Dr. Tekle Wolde",
-      category: "science",
+      title: "Occupational Health Fundamentals",
+      instructor: "Dr. Jennifer Adams",
+      category: "health-safety",
       level: "Intermediate",
-      duration: "14 weeks",
+      duration: "5 weeks",
       students: 1876,
       rating: 4.8,
       image: "/placeholder.svg",
-      price: "600 ETB",
-      description: "Master the principles of physics with practical examples and laboratory work."
+      price: "349 USD",
+      description: "Comprehensive occupational health principles with focus on workplace wellness and hazard control."
     },
     {
       id: 5,
-      title: "Computer Programming Basics",
-      instructor: "Eng. Dawit Bekele",
-      category: "technology",
-      level: "Beginner",
-      duration: "16 weeks",
-      students: 2943,
+      title: "Emergency Response Planning",
+      instructor: "Chief Mark Thompson",
+      category: "emergency-response",
+      level: "Advanced",
+      duration: "8 weeks",
+      students: 987,
       rating: 4.9,
       image: "/placeholder.svg",
-      price: "800 ETB",
-      description: "Learn programming fundamentals with Python and build your first applications."
+      price: "499 USD",
+      description: "Advanced emergency response planning and crisis management for safety professionals."
     },
     {
       id: 6,
-      title: "Amharic Literature",
-      instructor: "Prof. Genet Assefa",
-      category: "arts",
+      title: "Risk Assessment Mastery",
+      instructor: "Prof. Anna Williams",
+      category: "risk-management",
       level: "Intermediate",
       duration: "6 weeks",
-      students: 987,
+      students: 1654,
       rating: 4.6,
       image: "/placeholder.svg",
-      price: "Free",
-      description: "Study classical and modern Amharic literature and develop analytical skills."
+      price: "399 USD",
+      description: "Master risk assessment techniques and develop comprehensive safety management strategies."
     },
     {
       id: 7,
-      title: "Chemistry Lab Techniques",
-      instructor: "Dr. Hana Teshome",
-      category: "science",
+      title: "Construction Safety Standards",
+      instructor: "Eng. Robert Davis",
+      category: "industrial-safety",
       level: "Advanced",
-      duration: "12 weeks",
-      students: 654,
+      duration: "10 weeks",
+      students: 1243,
       rating: 4.7,
       image: "/placeholder.svg",
-      price: "700 ETB",
-      description: "Advanced chemistry laboratory techniques and experimental procedures."
+      price: "549 USD",
+      description: "Advanced construction safety standards and OSHA compliance for construction professionals."
     },
     {
       id: 8,
-      title: "Ethiopian Economics",
-      instructor: "Dr. Bereket Mengistu",
-      category: "history",
+      title: "Chemical Safety Management",
+      instructor: "Dr. Patricia Moore",
+      category: "workplace-safety",
       level: "Intermediate",
-      duration: "10 weeks",
-      students: 1432,
+      duration: "7 weeks",
+      students: 876,
       rating: 4.5,
       image: "/placeholder.svg",
-      price: "400 ETB",
-      description: "Understanding Ethiopia's economic development and current market dynamics."
+      price: "429 USD",
+      description: "Comprehensive chemical safety management including handling, storage, and emergency procedures."
     },
     {
       id: 9,
-      title: "Advanced Mathematics",
-      instructor: "Prof. Meron Asefa",
-      category: "mathematics",
+      title: "Safety Leadership Excellence",
+      instructor: "Prof. David Wilson",
+      category: "risk-management",
       level: "Advanced",
-      duration: "16 weeks",
-      students: 876,
+      duration: "12 weeks",
+      students: 654,
       rating: 4.9,
       image: "/placeholder.svg",
-      price: "900 ETB",
-      description: "Advanced calculus, linear algebra, and mathematical analysis for university preparation."
+      price: "699 USD",
+      description: "Advanced safety leadership course for managers and supervisors in safety-critical industries."
     }
   ];
 
@@ -189,8 +189,8 @@ const Courses = () => {
       <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <BookOpen className="h-8 w-8 text-emerald-600" />
-            <h1 className="text-2xl font-bold text-gray-800">EthioLearn</h1>
+            <Shield className="h-8 w-8 text-emerald-600" />
+            <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <a href="/" className="text-gray-600 hover:text-emerald-600 transition-colors">Home</a>
@@ -211,7 +211,7 @@ const Courses = () => {
             All Courses
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Discover our comprehensive collection of courses designed to help you excel in your studies and career.
+            Discover our comprehensive collection of safety courses designed to help you excel in your safety career.
           </p>
         </div>
 

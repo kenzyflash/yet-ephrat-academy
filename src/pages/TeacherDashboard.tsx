@@ -29,20 +29,20 @@ const TeacherDashboard = () => {
   ];
 
   const recentActivities = [
-    { action: "New assignment submitted", course: "Ethiopian History", time: "2 hours ago" },
-    { action: "Discussion post created", course: "Advanced Mathematics", time: "4 hours ago" },
-    { action: "Student question posted", course: "Ethiopian History", time: "6 hours ago" }
+    { action: "New assignment submitted", course: "Workplace Safety Fundamentals", time: "2 hours ago" },
+    { action: "Discussion post created", course: "Industrial Safety Protocols", time: "4 hours ago" },
+    { action: "Student question posted", course: "Fire Safety and Prevention", time: "6 hours ago" }
   ];
 
   return (
     <ProtectedRoute requiredRole="teacher">
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
-        <DashboardHeader title="EthioLearn - Teacher" />
+        <DashboardHeader title="SafHub - Teacher" />
 
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, Teacher!</h1>
-            <p className="text-gray-600">Manage your courses and connect with your students.</p>
+            <p className="text-gray-600">Manage your safety courses and connect with your students.</p>
           </div>
 
           <DashboardStats stats={teacherStats} />
@@ -82,11 +82,11 @@ const TeacherDashboard = () => {
                 <CardContent>
                   <div className="space-y-3">
                     <div className="p-3 border rounded-lg">
-                      <p className="font-medium text-gray-800 text-sm">Ethiopian History</p>
+                      <p className="font-medium text-gray-800 text-sm">Workplace Safety Fundamentals</p>
                       <p className="text-xs text-gray-600">Today, 2:00 PM</p>
                     </div>
                     <div className="p-3 border rounded-lg">
-                      <p className="font-medium text-gray-800 text-sm">Advanced Mathematics</p>
+                      <p className="font-medium text-gray-800 text-sm">Industrial Safety Protocols</p>
                       <p className="text-xs text-gray-600">Tomorrow, 10:00 AM</p>
                     </div>
                   </div>

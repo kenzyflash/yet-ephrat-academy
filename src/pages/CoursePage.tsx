@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +13,8 @@ import {
   Star,
   ArrowLeft,
   Download,
-  MessageSquare
+  MessageSquare,
+  Shield
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileDropdown from "@/components/ProfileDropdown";
@@ -232,8 +232,8 @@ const CoursePage = () => {
               Back to Dashboard
             </Button>
             <div className="flex items-center space-x-2">
-              <BookOpen className="h-8 w-8 text-emerald-600" />
-              <h1 className="text-2xl font-bold text-gray-800">EthioLearn</h1>
+              <Shield className="h-8 w-8 text-emerald-600" />
+              <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
             </div>
           </div>
           <ProfileDropdown />

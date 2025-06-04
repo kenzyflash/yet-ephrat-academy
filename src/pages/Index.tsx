@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import {
   Play, 
   ArrowRight,
   CheckCircle,
-  Globe,
+  Shield,
   Zap,
   Heart
 } from "lucide-react";
@@ -52,39 +53,39 @@ const Index = () => {
 
   const features = [
     {
-      icon: Globe,
-      title: "Ethiopian-Focused Content",
-      description: "Curriculum designed specifically for Ethiopian students with local context and examples."
+      icon: Shield,
+      title: "Safety-Focused Content",
+      description: "Comprehensive safety training designed by industry experts with real-world applications."
     },
     {
       icon: Zap,
       title: "Interactive Learning",
-      description: "Engaging multimedia content, quizzes, and hands-on projects to enhance understanding."
+      description: "Engaging multimedia content, simulations, and hands-on safety exercises to enhance understanding."
     },
     {
       icon: Heart,
       title: "Community Support",
-      description: "Connect with fellow students and teachers in a supportive learning environment."
+      description: "Connect with safety professionals and learners in a supportive learning environment."
     }
   ];
 
   const testimonials = [
     {
-      name: "Meron Tadesse",
-      role: "High School Student",
-      content: "EthioLearn helped me improve my grades significantly. The teachers are amazing!",
+      name: "John Martinez",
+      role: "Safety Manager",
+      content: "SafHub helped me advance my safety knowledge significantly. The instructors are amazing!",
       rating: 5
     },
     {
-      name: "Dr. Alemayehu Bekele",
-      role: "University Professor",
+      name: "Dr. Sarah Williams",
+      role: "Safety Consultant",
       content: "As an instructor, I love how engaged students become with this platform.",
       rating: 5
     },
     {
-      name: "Sara Ahmed",
-      role: "Adult Learner",
-      content: "I can finally pursue my education while managing my family responsibilities.",
+      name: "Mike Thompson",
+      role: "Industrial Worker",
+      content: "I can finally pursue safety certification while managing my work responsibilities.",
       rating: 5
     }
   ];
@@ -92,8 +93,8 @@ const Index = () => {
   const featuredCourses = [
     {
       id: 1,
-      title: "Ethiopian History and Culture",
-      instructor: "Dr. Alemayehu Tadesse",
+      title: "Workplace Safety Fundamentals",
+      instructor: "Dr. Sarah Johnson",
       students: 1234,
       rating: 4.8,
       price: "Free",
@@ -102,21 +103,21 @@ const Index = () => {
     },
     {
       id: 2,
-      title: "Mathematics for High School",
-      instructor: "Prof. Meron Asefa",
+      title: "Industrial Safety Protocols",
+      instructor: "Prof. Michael Chen",
       students: 2156,
       rating: 4.9,
-      price: "500 ETB",
+      price: "299 USD",
       image: "/placeholder.svg",
       level: "Intermediate"
     },
     {
       id: 3,
-      title: "English Language Mastery",
-      instructor: "Teacher Sarah Johnson",
+      title: "Fire Safety and Prevention",
+      instructor: "Captain Lisa Rodriguez",
       students: 3421,
       rating: 4.7,
-      price: "300 ETB",
+      price: "199 USD",
       image: "/placeholder.svg",
       level: "All Levels"
     }
@@ -128,8 +129,8 @@ const Index = () => {
       <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <BookOpen className="h-8 w-8 text-emerald-600" />
-            <h1 className="text-2xl font-bold text-gray-800">EthioLearn</h1>
+            <Shield className="h-8 w-8 text-emerald-600" />
+            <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <a href="/" className="text-emerald-600 font-medium">Home</a>
@@ -160,12 +161,12 @@ const Index = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-6">
-            Learn, Grow, and Succeed with
-            <span className="text-emerald-600"> EthioLearn</span>
+            Learn, Grow, and Stay Safe with
+            <span className="text-emerald-600"> SafHub</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Join thousands of Ethiopian students in our interactive online learning platform. 
-            Master new skills, advance your career, and achieve your educational goals.
+            Join thousands of safety professionals in our interactive online learning platform. 
+            Master safety skills, advance your career, and achieve your safety certification goals.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button 
@@ -203,10 +204,10 @@ const Index = () => {
       <section className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            Why Choose EthioLearn?
+            Why Choose SafHub?
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            We're committed to providing the best learning experience tailored for Ethiopian students.
+            We're committed to providing the best safety training experience for professionals worldwide.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -233,7 +234,7 @@ const Index = () => {
             Featured Courses
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Discover our most popular courses designed by expert Ethiopian educators.
+            Discover our most popular safety courses designed by expert safety professionals.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
@@ -292,7 +293,7 @@ const Index = () => {
             Explore Our Courses
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Search through our extensive catalog of courses to find the perfect fit for your learning goals.
+            Search through our extensive catalog of safety courses to find the perfect fit for your learning goals.
           </p>
         </div>
         <CourseSearch />
@@ -305,7 +306,7 @@ const Index = () => {
             What Our Students Say
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Join thousands of satisfied learners who have transformed their lives through education.
+            Join thousands of satisfied learners who have enhanced their safety knowledge through our platform.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -334,10 +335,10 @@ const Index = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="bg-gradient-to-r from-emerald-600 to-blue-600 rounded-2xl p-8 md:p-16 text-center text-white">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Start Your Learning Journey?
+            Ready to Start Your Safety Journey?
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join EthioLearn today and unlock your potential with our comprehensive online courses.
+            Join SafHub today and unlock your potential with our comprehensive safety training courses.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
