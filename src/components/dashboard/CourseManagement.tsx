@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Users, Calendar, BookOpen } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Calendar, BookOpen, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCourseData } from '@/hooks/useCourseData';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +21,11 @@ interface NewCourseData {
   price: string;
 }
 
-const CourseManagement = () => {
+interface CourseManagementProps {
+  onCourseSelect?: (courseId: string) => void;
+}
+
+const CourseManagement = ({ onCourseSelect }: CourseManagementProps) => {
   const { user } = useAuth();
   const { courses, loading, refetchCourses } = useCourseData();
   const { toast } = useToast();
@@ -38,6 +42,7 @@ const CourseManagement = () => {
   const [editingCourse, setEditingCourse] = useState<any>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
 
   const handleCreateCourse = async () => {
     if (!newCourse.title || !newCourse.description || !user) {
@@ -153,6 +158,13 @@ const CourseManagement = () => {
     }
   };
 
+  const handleCourseSelect = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    if (onCourseSelect) {
+      onCourseSelect(courseId);
+    }
+  };
+
   if (loading) {
     return <div>Loading courses...</div>;
   }
@@ -221,6 +233,21 @@ const CourseManagement = () => {
                   </select>
                 </div>
                 <div>
+                  <label className="text-sm font-medium">Category</label>
+                  <select
+                    value={newCourse.category}
+                    onChange={(e) => setNewCourse({ ...newCourse, category: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="Safety Management">Safety Management</option>
+                    <option value="Industrial Safety">Industrial Safety</option>
+                    <option value="Fire Safety">Fire Safety</option>
+                    <option value="Chemical Safety">Chemical Safety</option>
+                    <option value="Construction Safety">Construction Safety</option>
+                    <option value="Environmental Safety">Environmental Safety</option>
+                  </select>
+                </div>
+                <div>
                   <label className="text-sm font-medium">Price</label>
                   <Input
                     value={newCourse.price}
@@ -243,7 +270,13 @@ const CourseManagement = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {courses.map((course) => (
-          <div key={course.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+          <div 
+            key={course.id} 
+            className={`border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+              selectedCourseId === course.id ? 'ring-2 ring-emerald-500 bg-emerald-50' : ''
+            }`}
+            onClick={() => handleCourseSelect(course.id)}
+          >
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-800 mb-1">{course.title}</h3>
@@ -263,14 +296,29 @@ const CourseManagement = () => {
                 <Badge variant="default">
                   {course.level || 'Beginner'}
                 </Badge>
+                <Badge variant="outline">
+                  {course.category || 'General'}
+                </Badge>
               </div>
             </div>
             
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                <span className="font-medium">Rating:</span> {course.rating || 0}/5
+                <span className="font-medium">Rating:</span> {course.rating || 0}/5 | 
+                <span className="font-medium"> Price:</span> {course.price || 'Free'}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                {onCourseSelect && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleCourseSelect(course.id)}
+                    className={selectedCourseId === course.id ? 'bg-emerald-100' : ''}
+                  >
+                    <Settings className="mr-1 h-4 w-4" />
+                    {selectedCourseId === course.id ? 'Selected' : 'Select'}
+                  </Button>
+                )}
                 <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                   <DialogTrigger asChild>
                     <Button 
@@ -310,6 +358,41 @@ const CourseManagement = () => {
                           <Input
                             value={editingCourse.duration}
                             onChange={(e) => setEditingCourse({ ...editingCourse, duration: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Level</label>
+                          <select
+                            value={editingCourse.level}
+                            onChange={(e) => setEditingCourse({ ...editingCourse, level: e.target.value })}
+                            className="w-full p-2 border rounded-md"
+                          >
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                            <option value="All Levels">All Levels</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Category</label>
+                          <select
+                            value={editingCourse.category}
+                            onChange={(e) => setEditingCourse({ ...editingCourse, category: e.target.value })}
+                            className="w-full p-2 border rounded-md"
+                          >
+                            <option value="Safety Management">Safety Management</option>
+                            <option value="Industrial Safety">Industrial Safety</option>
+                            <option value="Fire Safety">Fire Safety</option>
+                            <option value="Chemical Safety">Chemical Safety</option>
+                            <option value="Construction Safety">Construction Safety</option>
+                            <option value="Environmental Safety">Environmental Safety</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium">Price</label>
+                          <Input
+                            value={editingCourse.price}
+                            onChange={(e) => setEditingCourse({ ...editingCourse, price: e.target.value })}
                           />
                         </div>
                         <div className="flex gap-2">

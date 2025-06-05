@@ -16,7 +16,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardStats from "@/components/dashboard/DashboardStats";
-import CourseManagement from "@/components/dashboard/CourseManagement";
+import EnhancedCourseManagement from "@/components/dashboard/EnhancedCourseManagement";
 import { useCourseData } from "@/hooks/useCourseData";
 
 const TeacherDashboard = () => {
@@ -71,7 +71,7 @@ const TeacherDashboard = () => {
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              <CourseManagement />
+              <EnhancedCourseManagement />
             </div>
 
             <div className="space-y-6">

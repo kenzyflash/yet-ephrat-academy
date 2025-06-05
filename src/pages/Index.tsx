@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +19,35 @@ import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import CourseSearch from "@/components/CourseSearch";
 import Footer from "@/components/Footer";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [featuredCourses, setFeaturedCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+
+  useEffect(() => {
+    fetchFeaturedCourses();
+  }, []);
+
+  const fetchFeaturedCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .order('student_count', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setFeaturedCourses(data || []);
+    } catch (error) {
+      console.error('Error fetching featured courses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSwitchToRegister = () => {
     setShowLogin(false);
@@ -87,39 +110,6 @@ const Index = () => {
       role: "Industrial Worker",
       content: "I can finally pursue safety certification while managing my work responsibilities.",
       rating: 5
-    }
-  ];
-
-  const featuredCourses = [
-    {
-      id: 1,
-      title: "Workplace Safety Fundamentals",
-      instructor: "Dr. Sarah Johnson",
-      students: 1234,
-      rating: 4.8,
-      price: "Free",
-      image: "/placeholder.svg",
-      level: "Beginner"
-    },
-    {
-      id: 2,
-      title: "Industrial Safety Protocols",
-      instructor: "Prof. Michael Chen",
-      students: 2156,
-      rating: 4.9,
-      price: "299 USD",
-      image: "/placeholder.svg",
-      level: "Intermediate"
-    },
-    {
-      id: 3,
-      title: "Fire Safety and Prevention",
-      instructor: "Captain Lisa Rodriguez",
-      students: 3421,
-      rating: 4.7,
-      price: "199 USD",
-      image: "/placeholder.svg",
-      level: "All Levels"
     }
   ];
 
@@ -237,47 +227,55 @@ const Index = () => {
             Discover our most popular safety courses designed by expert safety professionals.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          {featuredCourses.map((course) => (
-            <Card key={course.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
-              <div className="relative">
-                <img 
-                  src={course.image} 
-                  alt={course.title}
-                  className="w-full h-48 object-cover rounded-t-lg"
-                />
-                <Badge className="absolute top-3 left-3 bg-emerald-600 text-white">
-                  {course.level}
-                </Badge>
-                <Badge variant="secondary" className="absolute top-3 right-3">
-                  {course.price}
-                </Badge>
-              </div>
-              <CardHeader>
-                <CardTitle className="text-xl text-gray-800">{course.title}</CardTitle>
-                <CardDescription className="text-gray-600">
-                  by {course.instructor}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                  <span className="flex items-center">
-                    <Users className="h-4 w-4 mr-1" />
-                    {course.students.toLocaleString()} students
-                  </span>
-                  <span className="flex items-center">
-                    <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
-                    {course.rating}
-                  </span>
+        
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="text-gray-600">Loading courses...</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            {featuredCourses.map((course) => (
+              <Card key={course.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+                <div className="relative">
+                  <img 
+                    src={course.image_url || "/placeholder.svg"} 
+                    alt={course.title}
+                    className="w-full h-48 object-cover rounded-t-lg"
+                  />
+                  <Badge className="absolute top-3 left-3 bg-emerald-600 text-white">
+                    {course.level || 'All Levels'}
+                  </Badge>
+                  <Badge variant="secondary" className="absolute top-3 right-3">
+                    {course.price || 'Free'}
+                  </Badge>
                 </div>
-                <Button onClick={handleEnrollClick} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                  <Play className="mr-2 h-4 w-4" />
-                  Enroll Now
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <CardHeader>
+                  <CardTitle className="text-xl text-gray-800">{course.title}</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    by {course.instructor_name}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                    <span className="flex items-center">
+                      <Users className="h-4 w-4 mr-1" />
+                      {(course.student_count || 0).toLocaleString()} students
+                    </span>
+                    <span className="flex items-center">
+                      <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
+                      {course.rating || 0}
+                    </span>
+                  </div>
+                  <Button onClick={handleEnrollClick} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                    <Play className="mr-2 h-4 w-4" />
+                    Enroll Now
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+        
         <div className="text-center">
           <Button variant="outline" size="lg" onClick={() => window.location.href = "/courses"}>
             View All Courses
