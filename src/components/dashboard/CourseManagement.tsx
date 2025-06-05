@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,52 +8,39 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Edit, Trash2, Users, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useCourseData } from '@/hooks/useCourseData';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface Course {
-  id: number;
+interface NewCourseData {
   title: string;
   description: string;
-  students: number;
-  nextClass: string;
-  status: 'Active' | 'Draft' | 'Completed';
-  completionRate: number;
+  duration: string;
+  level: string;
+  category: string;
+  price: string;
 }
 
 const CourseManagement = () => {
-  const [courses, setCourses] = useState<Course[]>([
-    {
-      id: 1,
-      title: "Ethiopian History and Culture",
-      description: "Comprehensive course covering Ethiopian history from ancient times to modern day.",
-      students: 1234,
-      nextClass: "Today, 2:00 PM",
-      status: "Active",
-      completionRate: 78
-    },
-    {
-      id: 2,
-      title: "Advanced Mathematics",
-      description: "Advanced mathematical concepts including calculus and algebra.",
-      students: 856,
-      nextClass: "Tomorrow, 10:00 AM",
-      status: "Active",
-      completionRate: 65
-    }
-  ]);
-
-  const [newCourse, setNewCourse] = useState({
-    title: '',
-    description: '',
-    nextClass: ''
-  });
-
-  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { user } = useAuth();
+  const { courses, loading, refetchCourses } = useCourseData();
   const { toast } = useToast();
 
-  const handleCreateCourse = () => {
-    if (!newCourse.title || !newCourse.description) {
+  const [newCourse, setNewCourse] = useState<NewCourseData>({
+    title: '',
+    description: '',
+    duration: '',
+    level: 'Beginner',
+    category: 'Safety Management',
+    price: 'Free'
+  });
+
+  const [editingCourse, setEditingCourse] = useState<any>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const handleCreateCourse = async () => {
+    if (!newCourse.title || !newCourse.description || !user) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -62,56 +49,113 @@ const CourseManagement = () => {
       return;
     }
 
-    const course: Course = {
-      id: Date.now(),
-      title: newCourse.title,
-      description: newCourse.description,
-      students: 0,
-      nextClass: newCourse.nextClass || "Not scheduled",
-      status: "Draft",
-      completionRate: 0
-    };
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .insert({
+          title: newCourse.title,
+          description: newCourse.description,
+          instructor_name: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Teacher',
+          instructor_id: user.id,
+          duration: newCourse.duration,
+          level: newCourse.level,
+          category: newCourse.category,
+          price: newCourse.price,
+          student_count: 0,
+          rating: 0,
+          total_lessons: 0
+        });
 
-    setCourses([...courses, course]);
-    setNewCourse({ title: '', description: '', nextClass: '' });
-    setIsCreateDialogOpen(false);
-    
-    toast({
-      title: "Course created",
-      description: "Your new course has been created successfully.",
-    });
+      if (error) throw error;
+
+      await refetchCourses();
+      setNewCourse({
+        title: '',
+        description: '',
+        duration: '',
+        level: 'Beginner',
+        category: 'Safety Management',
+        price: 'Free'
+      });
+      setIsCreateDialogOpen(false);
+      
+      toast({
+        title: "Course created",
+        description: "Your new course has been created successfully.",
+      });
+    } catch (error) {
+      console.error('Error creating course:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create course. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleEditCourse = () => {
-    if (!editingCourse) return;
+  const handleEditCourse = async () => {
+    if (!editingCourse || !user) return;
 
-    setCourses(courses.map(course => 
-      course.id === editingCourse.id ? editingCourse : course
-    ));
-    setEditingCourse(null);
-    setIsEditDialogOpen(false);
-    
-    toast({
-      title: "Course updated",
-      description: "Course details have been updated successfully.",
-    });
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          title: editingCourse.title,
+          description: editingCourse.description,
+          duration: editingCourse.duration,
+          level: editingCourse.level,
+          category: editingCourse.category,
+          price: editingCourse.price
+        })
+        .eq('id', editingCourse.id);
+
+      if (error) throw error;
+
+      await refetchCourses();
+      setEditingCourse(null);
+      setIsEditDialogOpen(false);
+      
+      toast({
+        title: "Course updated",
+        description: "Course details have been updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating course:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update course. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleDeleteCourse = (courseId: number) => {
-    setCourses(courses.filter(course => course.id !== courseId));
-    toast({
-      title: "Course deleted",
-      description: "The course has been removed.",
-    });
+  const handleDeleteCourse = async (courseId: string) => {
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      await refetchCourses();
+      toast({
+        title: "Course deleted",
+        description: "The course has been removed.",
+      });
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete course. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const toggleCourseStatus = (courseId: number) => {
-    setCourses(courses.map(course => 
-      course.id === courseId 
-        ? { ...course, status: course.status === 'Active' ? 'Draft' : 'Active' as Course['status'] }
-        : course
-    ));
-  };
+  if (loading) {
+    return <div>Loading courses...</div>;
+  }
 
   return (
     <Card className="bg-white/80 backdrop-blur-sm">
@@ -156,11 +200,32 @@ const CourseManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Next Class (Optional)</label>
+                  <label className="text-sm font-medium">Duration</label>
                   <Input
-                    value={newCourse.nextClass}
-                    onChange={(e) => setNewCourse({ ...newCourse, nextClass: e.target.value })}
-                    placeholder="e.g., Monday, 10:00 AM"
+                    value={newCourse.duration}
+                    onChange={(e) => setNewCourse({ ...newCourse, duration: e.target.value })}
+                    placeholder="e.g., 4 weeks"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Level</label>
+                  <select
+                    value={newCourse.level}
+                    onChange={(e) => setNewCourse({ ...newCourse, level: e.target.value })}
+                    className="w-full p-2 border rounded-md"
+                  >
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                    <option value="All Levels">All Levels</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Price</label>
+                  <Input
+                    value={newCourse.price}
+                    onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                    placeholder="e.g., Free, $99"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -186,28 +251,24 @@ const CourseManagement = () => {
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <span className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
-                    {course.students.toLocaleString()} students
+                    {(course.student_count || 0).toLocaleString()} students
                   </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    {course.nextClass}
+                    {course.duration || 'Duration TBD'}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Badge 
-                  variant={course.status === 'Active' ? 'default' : 'secondary'}
-                  className="cursor-pointer"
-                  onClick={() => toggleCourseStatus(course.id)}
-                >
-                  {course.status}
+                <Badge variant="default">
+                  {course.level || 'Beginner'}
                 </Badge>
               </div>
             </div>
             
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                <span className="font-medium">Completion Rate:</span> {course.completionRate}%
+                <span className="font-medium">Rating:</span> {course.rating || 0}/5
               </div>
               <div className="flex gap-2">
                 <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -245,10 +306,10 @@ const CourseManagement = () => {
                           />
                         </div>
                         <div>
-                          <label className="text-sm font-medium">Next Class</label>
+                          <label className="text-sm font-medium">Duration</label>
                           <Input
-                            value={editingCourse.nextClass}
-                            onChange={(e) => setEditingCourse({ ...editingCourse, nextClass: e.target.value })}
+                            value={editingCourse.duration}
+                            onChange={(e) => setEditingCourse({ ...editingCourse, duration: e.target.value })}
                           />
                         </div>
                         <div className="flex gap-2">
@@ -276,6 +337,14 @@ const CourseManagement = () => {
             </div>
           </div>
         ))}
+
+        {courses.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-medium mb-2">No courses yet</h3>
+            <p>Create your first course to get started!</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -193,7 +193,7 @@ export type Database = {
           duration: string | null
           id: string
           image_url: string | null
-          instructor_id: string
+          instructor_id: string | null
           instructor_name: string
           level: string | null
           price: string | null
@@ -210,7 +210,7 @@ export type Database = {
           duration?: string | null
           id?: string
           image_url?: string | null
-          instructor_id: string
+          instructor_id?: string | null
           instructor_name: string
           level?: string | null
           price?: string | null
@@ -227,7 +227,7 @@ export type Database = {
           duration?: string | null
           id?: string
           image_url?: string | null
-          instructor_id?: string
+          instructor_id?: string | null
           instructor_name?: string
           level?: string | null
           price?: string | null

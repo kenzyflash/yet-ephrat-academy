@@ -17,14 +17,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardStats from "@/components/dashboard/DashboardStats";
 import CourseManagement from "@/components/dashboard/CourseManagement";
+import { useCourseData } from "@/hooks/useCourseData";
 
 const TeacherDashboard = () => {
   const { user, userRole } = useAuth();
+  const { courses, loading } = useCourseData();
+
+  // Calculate stats from real data
+  const totalStudents = courses.reduce((sum, course) => sum + (course.student_count || 0), 0);
+  const averageRating = courses.length > 0 
+    ? (courses.reduce((sum, course) => sum + (course.rating || 0), 0) / courses.length * 100 / 5).toFixed(0)
+    : 0;
 
   const teacherStats = [
-    { label: "My Courses", value: "2", icon: BookOpen, color: "text-blue-600" },
-    { label: "Total Students", value: "2,090", icon: Users, color: "text-green-600" },
-    { label: "Avg. Completion", value: "72%", icon: BarChart3, color: "text-purple-600" },
+    { label: "My Courses", value: courses.length.toString(), icon: BookOpen, color: "text-blue-600" },
+    { label: "Total Students", value: totalStudents.toLocaleString(), icon: Users, color: "text-green-600" },
+    { label: "Avg. Rating", value: `${averageRating}%`, icon: BarChart3, color: "text-purple-600" },
     { label: "Next Class", value: "2h", icon: Clock, color: "text-orange-600" }
   ];
 
@@ -33,6 +41,19 @@ const TeacherDashboard = () => {
     { action: "Discussion post created", course: "Industrial Safety Protocols", time: "4 hours ago" },
     { action: "Student question posted", course: "Fire Safety and Prevention", time: "6 hours ago" }
   ];
+
+  if (loading) {
+    return (
+      <ProtectedRoute requiredRole="teacher">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
+          <DashboardHeader title="SafHub - Teacher" />
+          <div className="container mx-auto px-4 py-8">
+            <div className="text-center">Loading...</div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute requiredRole="teacher">
@@ -81,14 +102,12 @@ const TeacherDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="p-3 border rounded-lg">
-                      <p className="font-medium text-gray-800 text-sm">Workplace Safety Fundamentals</p>
-                      <p className="text-xs text-gray-600">Today, 2:00 PM</p>
-                    </div>
-                    <div className="p-3 border rounded-lg">
-                      <p className="font-medium text-gray-800 text-sm">Industrial Safety Protocols</p>
-                      <p className="text-xs text-gray-600">Tomorrow, 10:00 AM</p>
-                    </div>
+                    {courses.slice(0, 2).map((course) => (
+                      <div key={course.id} className="p-3 border rounded-lg">
+                        <p className="font-medium text-gray-800 text-sm">{course.title}</p>
+                        <p className="text-xs text-gray-600">Today, 2:00 PM</p>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
