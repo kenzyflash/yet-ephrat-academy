@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Users, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Calendar, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCourseData } from '@/hooks/useCourseData';
 import { supabase } from '@/integrations/supabase/client';
