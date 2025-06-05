@@ -61,17 +61,17 @@ const Contact = () => {
     {
       icon: MapPin,
       title: "Visit Us",
-      details: ["Addis Ababa, Ethiopia", "Bole Atlas Area"]
+      details: ["Safety Training Center", "Industrial District"]
     },
     {
       icon: Phone,
       title: "Call Us",
-      details: ["+251 11 123 4567", "+251 91 234 5678"]
+      details: ["+1 (555) 123-4567", "+1 (555) 234-5678"]
     },
     {
       icon: Mail,
       title: "Email Us",
-      details: ["info@ethiolearn.com", "support@ethiolearn.com"]
+      details: ["info@safhub.com", "support@safhub.com"]
     },
     {
       icon: Clock,
@@ -87,7 +87,7 @@ const Contact = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <BookOpen className="h-8 w-8 text-emerald-600" />
-            <h1 className="text-2xl font-bold text-gray-800">EthioLearn</h1>
+            <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <a href="/" className="text-gray-600 hover:text-emerald-600 transition-colors">Home</a>
@@ -108,7 +108,7 @@ const Contact = () => {
             Get in Touch
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Have questions about our courses or need support? We're here to help you succeed in your learning journey.
+            Have questions about our safety courses or need support? We're here to help you succeed in your safety training journey.
           </p>
         </div>
 
@@ -133,7 +133,7 @@ const Contact = () => {
                     </label>
                     <Input
                       id="name"
-                      placeholder="Abebe Tadesse"
+                      placeholder="John Smith"
                       value={formData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
                       required
@@ -146,7 +146,7 @@ const Contact = () => {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="abebe@example.com"
+                      placeholder="john@example.com"
                       value={formData.email}
                       onChange={(e) => handleInputChange("email", e.target.value)}
                       required
@@ -229,16 +229,16 @@ const Contact = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-gray-800 mb-1">How do I enroll in a course?</h4>
-                  <p className="text-sm text-gray-600">Simply create an account and browse our course catalog to get started.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">How do I enroll in a safety course?</h4>
+                  <p className="text-sm text-gray-600">Simply create an account and browse our safety course catalog to get started.</p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-800 mb-1">Are certificates provided?</h4>
-                  <p className="text-sm text-gray-600">Yes, you'll receive a certificate upon successful completion of any course.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">Are safety certificates provided?</h4>
+                  <p className="text-sm text-gray-600">Yes, you'll receive a certificate upon successful completion of any safety course.</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-800 mb-1">What payment methods do you accept?</h4>
-                  <p className="text-sm text-gray-600">We accept various payment methods including mobile money and bank transfers.</p>
+                  <p className="text-sm text-gray-600">We accept various payment methods including credit cards and corporate accounts.</p>
                 </div>
               </CardContent>
             </Card>

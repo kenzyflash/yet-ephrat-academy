@@ -25,7 +25,7 @@ const AdminDashboard = () => {
     { label: "Total Users", value: "5,432", icon: Users, color: "text-blue-600", change: "+12%" },
     { label: "Active Courses", value: "124", icon: BookOpen, color: "text-green-600", change: "+8%" },
     { label: "Teachers", value: "89", icon: GraduationCap, color: "text-purple-600", change: "+5%" },
-    { label: "Monthly Revenue", value: "45,230 ETB", icon: TrendingUp, color: "text-orange-600", change: "+18%" }
+    { label: "Monthly Revenue", value: "45,230 USD", icon: TrendingUp, color: "text-orange-600", change: "+18%" }
   ];
 
   const recentActions = [
@@ -38,12 +38,12 @@ const AdminDashboard = () => {
   return (
     <ProtectedRoute requiredRole="admin">
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
-        <DashboardHeader title="EthioLearn - Admin" showSettings />
+        <DashboardHeader title="SafHub - Admin" showSettings />
 
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Administrator Dashboard</h1>
-            <p className="text-gray-600">Monitor and manage the EthioLearn platform.</p>
+            <p className="text-gray-600">Monitor and manage the SafHub platform.</p>
           </div>
 
           <DashboardStats stats={systemStats} />
