@@ -7,21 +7,21 @@ import Footer from "@/components/Footer";
 const About = () => {
   const teamMembers = [
     {
-      name: "Dr. Sarah Johnson",
+      name: "Dr. Meron Asefa",
       role: "Founder & CEO",
-      description: "Safety technology pioneer with 15+ years in industrial safety training.",
+      description: "Educational technology pioneer with 15+ years in Ethiopian education.",
       image: "/placeholder.svg"
     },
     {
-      name: "Prof. Michael Chen",
+      name: "Prof. Abebe Kebede",
       role: "Head of Curriculum",
-      description: "Former safety director specializing in workplace safety and risk management.",
+      description: "Former education director specializing in Ethiopian curriculum development.",
       image: "/placeholder.svg"
     },
     {
-      name: "Jennifer Adams",
+      name: "Hanna Tadesse",
       role: "Chief Technology Officer",
-      description: "Software engineer passionate about democratizing access to safety training.",
+      description: "Software engineer passionate about democratizing access to education in Ethiopia.",
       image: "/placeholder.svg"
     }
   ];
@@ -29,31 +29,31 @@ const About = () => {
   const values = [
     {
       icon: Heart,
-      title: "Safety-Centered",
-      description: "Every decision we make puts safety professional success and workplace safety first."
+      title: "Student-Centered",
+      description: "Every decision we make puts Ethiopian student success and educational excellence first."
     },
     {
       icon: Globe,
-      title: "Accessible Training",
-      description: "Breaking down barriers to quality safety training for all professionals worldwide."
+      title: "Accessible Education",
+      description: "Breaking down barriers to quality education for all Ethiopian students."
     },
     {
       icon: Target,
       title: "Excellence",
-      description: "Committed to delivering the highest quality safety training experiences."
+      description: "Committed to delivering the highest quality educational experiences."
     },
     {
       icon: Users,
       title: "Community",
-      description: "Building strong connections between safety professionals, trainers, and organizations."
+      description: "Building strong connections between students, teachers, and families."
     }
   ];
 
   const achievements = [
-    { number: "10,000+", label: "Safety Professionals Trained" },
-    { number: "500+", label: "Safety Courses Available" },
+    { number: "10,000+", label: "Students Educated" },
+    { number: "500+", label: "Courses Available" },
     { number: "200+", label: "Expert Instructors" },
-    { number: "95%", label: "Training Satisfaction" }
+    { number: "95%", label: "Student Satisfaction" }
   ];
 
   return (
@@ -84,8 +84,8 @@ const About = () => {
             About SafHub
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            We're on a mission to transform safety training worldwide by making quality safety education 
-            accessible, engaging, and professionally relevant for every safety professional.
+            We're on a mission to transform education in Ethiopia by making quality education 
+            accessible, engaging, and culturally relevant for every Ethiopian student.
           </p>
         </div>
 
@@ -111,21 +111,21 @@ const About = () => {
             </h2>
             <p className="text-lg text-gray-600 mb-6">
               SafHub was founded with a simple yet powerful vision: to democratize access to 
-              quality safety training for professionals worldwide. We believe that every safety professional, 
-              regardless of their location or background, deserves access to world-class safety training resources.
+              quality education for Ethiopian students. We believe that every student, 
+              regardless of their location or background, deserves access to world-class educational resources.
             </p>
             <p className="text-lg text-gray-600 mb-6">
-              Our platform combines cutting-edge technology with deep understanding of safety industry 
-              needs, creating a training environment that is both modern and professionally authentic.
+              Our platform combines cutting-edge technology with deep understanding of Ethiopian 
+              educational needs, creating a learning environment that is both modern and culturally authentic.
             </p>
             <div className="space-y-3">
               <div className="flex items-center">
                 <CheckCircle className="h-5 w-5 text-emerald-600 mr-3" />
-                <span className="text-gray-700">Industry-relevant curriculum</span>
+                <span className="text-gray-700">Ethiopian curriculum-aligned content</span>
               </div>
               <div className="flex items-center">
                 <CheckCircle className="h-5 w-5 text-emerald-600 mr-3" />
-                <span className="text-gray-700">Expert safety professionals</span>
+                <span className="text-gray-700">Expert Ethiopian educators</span>
               </div>
               <div className="flex items-center">
                 <CheckCircle className="h-5 w-5 text-emerald-600 mr-3" />
@@ -140,7 +140,7 @@ const About = () => {
           <div className="relative">
             <img 
               src="/placeholder.svg" 
-              alt="Safety professionals learning"
+              alt="Ethiopian students learning"
               className="rounded-lg shadow-lg w-full"
             />
           </div>
@@ -154,7 +154,7 @@ const About = () => {
             Our Values
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            These core values guide everything we do and shape the way we serve our safety community.
+            These core values guide everything we do and shape the way we serve our educational community.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -181,7 +181,7 @@ const About = () => {
             Meet Our Team
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Passionate safety professionals and technologists working together to transform safety training.
+            Passionate educators and technologists working together to transform Ethiopian education.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -210,10 +210,10 @@ const About = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="bg-gradient-to-r from-emerald-600 to-blue-600 rounded-2xl p-8 md:p-16 text-center text-white">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Join Our Safety Training Revolution
+            Join Our Educational Revolution
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Be part of the movement to transform safety training worldwide. Start your safety learning journey today.
+            Be part of the movement to transform education in Ethiopia. Start your learning journey today.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 

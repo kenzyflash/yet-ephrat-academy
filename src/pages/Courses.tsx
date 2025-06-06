@@ -1,10 +1,11 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpen, Search, Star, Clock, Users, Play, Filter, Shield } from "lucide-react";
+import { BookOpen, Search, Star, Clock, Users, Play, Filter } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
@@ -20,12 +21,12 @@ const Courses = () => {
 
   const categories = [
     { value: "all", label: "All Categories" },
-    { value: "workplace-safety", label: "Workplace Safety" },
-    { value: "industrial-safety", label: "Industrial Safety" },
-    { value: "fire-safety", label: "Fire Safety" },
-    { value: "health-safety", label: "Health & Safety" },
-    { value: "emergency-response", label: "Emergency Response" },
-    { value: "risk-management", label: "Risk Management" }
+    { value: "mathematics", label: "Mathematics" },
+    { value: "science", label: "Science" },
+    { value: "english", label: "English" },
+    { value: "social-studies", label: "Social Studies" },
+    { value: "amharic", label: "Amharic" },
+    { value: "geography", label: "Geography" }
   ];
 
   const levels = [
@@ -38,120 +39,120 @@ const Courses = () => {
   const allCourses = [
     {
       id: 1,
-      title: "Workplace Safety Fundamentals",
-      instructor: "Dr. Sarah Johnson",
-      category: "workplace-safety",
+      title: "Mathematics Fundamentals",
+      instructor: "Dr. Meron Asefa",
+      category: "mathematics",
       level: "Beginner",
       duration: "4 weeks",
       students: 1234,
       rating: 4.8,
       image: "/placeholder.svg",
       price: "Free",
-      description: "Learn essential workplace safety principles and risk assessment techniques for modern work environments."
+      description: "Learn essential mathematics principles and problem-solving techniques for Ethiopian curriculum."
     },
     {
       id: 2,
-      title: "Industrial Safety Protocols",
-      instructor: "Prof. Michael Chen",
-      category: "industrial-safety",
+      title: "Ethiopian History",
+      instructor: "Prof. Abebe Kebede",
+      category: "social-studies",
       level: "Intermediate",
       duration: "6 weeks",
       students: 2156,
       rating: 4.9,
       image: "/placeholder.svg",
-      price: "299 USD",
-      description: "Comprehensive industrial safety course covering hazard identification and safety management systems."
+      price: "299 Birr",
+      description: "Comprehensive Ethiopian history course covering ancient civilizations to modern times."
     },
     {
       id: 3,
-      title: "Fire Safety and Prevention",
-      instructor: "Captain Lisa Rodriguez",
-      category: "fire-safety",
+      title: "English Language Skills",
+      instructor: "Ms. Hanna Tadesse",
+      category: "english",
       level: "All Levels",
       duration: "3 weeks",
       students: 3421,
       rating: 4.7,
       image: "/placeholder.svg",
-      price: "199 USD",
-      description: "Essential fire safety knowledge for workplace and facility fire prevention and emergency response."
+      price: "199 Birr",
+      description: "Essential English language skills for Ethiopian students including reading, writing, and speaking."
     },
     {
       id: 4,
-      title: "Occupational Health Fundamentals",
-      instructor: "Dr. Jennifer Adams",
-      category: "health-safety",
+      title: "Biology Fundamentals",
+      instructor: "Dr. Dawit Alemayehu",
+      category: "science",
       level: "Intermediate",
       duration: "5 weeks",
       students: 1876,
       rating: 4.8,
       image: "/placeholder.svg",
-      price: "349 USD",
-      description: "Comprehensive occupational health principles with focus on workplace wellness and hazard control."
+      price: "349 Birr",
+      description: "Comprehensive biology course covering cell structure, genetics, and ecosystem dynamics."
     },
     {
       id: 5,
-      title: "Emergency Response Planning",
-      instructor: "Chief Mark Thompson",
-      category: "emergency-response",
+      title: "Advanced Chemistry",
+      instructor: "Prof. Sara Getachew",
+      category: "science",
       level: "Advanced",
       duration: "8 weeks",
       students: 987,
       rating: 4.9,
       image: "/placeholder.svg",
-      price: "499 USD",
-      description: "Advanced emergency response planning and crisis management for safety professionals."
+      price: "499 Birr",
+      description: "Advanced chemistry course for preparing for university entrance exams."
     },
     {
       id: 6,
-      title: "Risk Assessment Mastery",
-      instructor: "Prof. Anna Williams",
-      category: "risk-management",
+      title: "Geography of Ethiopia",
+      instructor: "Mr. Tekle Wolde",
+      category: "geography",
       level: "Intermediate",
       duration: "6 weeks",
       students: 1654,
       rating: 4.6,
       image: "/placeholder.svg",
-      price: "399 USD",
-      description: "Master risk assessment techniques and develop comprehensive safety management strategies."
+      price: "399 Birr",
+      description: "Comprehensive geography course focusing on Ethiopian landscapes, climate, and regions."
     },
     {
       id: 7,
-      title: "Construction Safety Standards",
-      instructor: "Eng. Robert Davis",
-      category: "industrial-safety",
+      title: "Amharic Literature",
+      instructor: "Dr. Almaz Tesfaye",
+      category: "amharic",
       level: "Advanced",
       duration: "10 weeks",
       students: 1243,
       rating: 4.7,
       image: "/placeholder.svg",
-      price: "549 USD",
-      description: "Advanced construction safety standards and OSHA compliance for construction professionals."
+      price: "549 Birr",
+      description: "Advanced Amharic literature course covering classical and modern Ethiopian literature."
     },
     {
       id: 8,
-      title: "Chemical Safety Management",
-      instructor: "Dr. Patricia Moore",
-      category: "workplace-safety",
+      title: "Physics Concepts",
+      instructor: "Prof. Yonas Bekele",
+      category: "science",
       level: "Intermediate",
       duration: "7 weeks",
       students: 876,
       rating: 4.5,
       image: "/placeholder.svg",
-      price: "429 USD",
-      description: "Comprehensive chemical safety management including handling, storage, and emergency procedures."
+      price: "429 Birr",
+      description: "Essential physics concepts including mechanics, electricity, and magnetism."
     },
     {
       id: 9,
-      title: "Safety Leadership Excellence",
-      instructor: "Prof. David Wilson",
-      category: "risk-management",
+      title: "Advanced Mathematics",
+      instructor: "Dr. Meseret Hailu",
+      category: "mathematics",
       level: "Advanced",
       duration: "12 weeks",
       students: 654,
       rating: 4.9,
       image: "/placeholder.svg",
-      price: "699 USD",
-      description: "Advanced safety leadership course for managers and supervisors in safety-critical industries."
+      price: "699 Birr",
+      description: "Advanced mathematics course for university preparation including calculus and statistics."
     }
   ];
 
@@ -189,7 +190,7 @@ const Courses = () => {
       <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-emerald-600" />
+            <BookOpen className="h-8 w-8 text-emerald-600" />
             <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">

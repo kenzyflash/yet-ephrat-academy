@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import {
   Play, 
   ArrowRight,
   CheckCircle,
-  Shield,
+  Globe,
   Zap,
   Heart
 } from "lucide-react";
@@ -76,39 +77,39 @@ const Index = () => {
 
   const features = [
     {
-      icon: Shield,
-      title: "Safety-Focused Content",
-      description: "Comprehensive safety training designed by industry experts with real-world applications."
+      icon: BookOpen,
+      title: "Quality Education",
+      description: "Comprehensive curriculum designed by Ethiopian education experts with culturally relevant content."
     },
     {
       icon: Zap,
       title: "Interactive Learning",
-      description: "Engaging multimedia content, simulations, and hands-on safety exercises to enhance understanding."
+      description: "Engaging multimedia content, interactive exercises, and hands-on learning experiences."
     },
     {
       icon: Heart,
       title: "Community Support",
-      description: "Connect with safety professionals and learners in a supportive learning environment."
+      description: "Connect with fellow Ethiopian students and teachers in a supportive learning environment."
     }
   ];
 
   const testimonials = [
     {
-      name: "John Martinez",
-      role: "Safety Manager",
-      content: "SafHub helped me advance my safety knowledge significantly. The instructors are amazing!",
+      name: "Abebe Kebede",
+      role: "High School Student",
+      content: "SafHub helped me improve my grades significantly. The teachers are amazing!",
       rating: 5
     },
     {
-      name: "Dr. Sarah Williams",
-      role: "Safety Consultant",
+      name: "Dr. Meron Asefa",
+      role: "Teacher",
       content: "As an instructor, I love how engaged students become with this platform.",
       rating: 5
     },
     {
-      name: "Mike Thompson",
-      role: "Industrial Worker",
-      content: "I can finally pursue safety certification while managing my work responsibilities.",
+      name: "Hanna Tadesse",
+      role: "University Student",
+      content: "I can finally pursue my education while managing my other responsibilities.",
       rating: 5
     }
   ];
@@ -119,7 +120,7 @@ const Index = () => {
       <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-emerald-600" />
+            <BookOpen className="h-8 w-8 text-emerald-600" />
             <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
@@ -151,12 +152,12 @@ const Index = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-6">
-            Learn, Grow, and Stay Safe with
+            Learn, Grow, and Excel with
             <span className="text-emerald-600"> SafHub</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Join thousands of safety professionals in our interactive online learning platform. 
-            Master safety skills, advance your career, and achieve your safety certification goals.
+            Join thousands of Ethiopian students in our interactive online learning platform. 
+            Master your subjects, advance your education, and achieve your academic goals.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button 
@@ -197,7 +198,7 @@ const Index = () => {
             Why Choose SafHub?
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            We're committed to providing the best safety training experience for professionals worldwide.
+            We're committed to providing the best educational experience for Ethiopian students.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -224,7 +225,7 @@ const Index = () => {
             Featured Courses
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Discover our most popular safety courses designed by expert safety professionals.
+            Discover our most popular courses designed by expert Ethiopian educators.
           </p>
         </div>
         
@@ -291,7 +292,7 @@ const Index = () => {
             Explore Our Courses
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Search through our extensive catalog of safety courses to find the perfect fit for your learning goals.
+            Search through our extensive catalog of educational courses to find the perfect fit for your learning goals.
           </p>
         </div>
         <CourseSearch />
@@ -304,7 +305,7 @@ const Index = () => {
             What Our Students Say
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Join thousands of satisfied learners who have enhanced their safety knowledge through our platform.
+            Join thousands of satisfied learners who have enhanced their education through our platform.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -333,10 +334,10 @@ const Index = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="bg-gradient-to-r from-emerald-600 to-blue-600 rounded-2xl p-8 md:p-16 text-center text-white">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Start Your Safety Journey?
+            Ready to Start Your Learning Journey?
           </h2>
           <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join SafHub today and unlock your potential with our comprehensive safety training courses.
+            Join SafHub today and unlock your potential with our comprehensive educational courses.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
