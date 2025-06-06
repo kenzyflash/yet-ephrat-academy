@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookOpen, Search, Star, Clock, Users, Play, Filter } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import Footer from "@/components/Footer";
@@ -39,20 +40,20 @@ const Courses = () => {
   const allCourses = [
     {
       id: 1,
-      title: "Mathematics Fundamentals",
+      title: "Mathematics Grade 12",
       instructor: "Dr. Meron Asefa",
       category: "mathematics",
-      level: "Beginner",
-      duration: "4 weeks",
+      level: "Advanced",
+      duration: "8 weeks",
       students: 1234,
       rating: 4.8,
       image: "/placeholder.svg",
       price: "Free",
-      description: "Learn essential mathematics principles and problem-solving techniques for Ethiopian curriculum."
+      description: "Advanced mathematics course covering calculus, algebra, and geometry for Grade 12 Ethiopian curriculum."
     },
     {
       id: 2,
-      title: "Ethiopian History",
+      title: "Ethiopian History and Culture",
       instructor: "Prof. Abebe Kebede",
       category: "social-studies",
       level: "Intermediate",
@@ -61,20 +62,20 @@ const Courses = () => {
       rating: 4.9,
       image: "/placeholder.svg",
       price: "299 Birr",
-      description: "Comprehensive Ethiopian history course covering ancient civilizations to modern times."
+      description: "Comprehensive study of Ethiopian history from ancient times to modern era, including cultural heritage."
     },
     {
       id: 3,
-      title: "English Language Skills",
+      title: "English Language Arts Grade 10",
       instructor: "Ms. Hanna Tadesse",
       category: "english",
-      level: "All Levels",
-      duration: "3 weeks",
+      level: "Intermediate",
+      duration: "10 weeks",
       students: 3421,
       rating: 4.7,
       image: "/placeholder.svg",
       price: "199 Birr",
-      description: "Essential English language skills for Ethiopian students including reading, writing, and speaking."
+      description: "Comprehensive English language course focusing on reading, writing, speaking, and grammar skills."
     },
     {
       id: 4,
@@ -87,11 +88,11 @@ const Courses = () => {
       rating: 4.8,
       image: "/placeholder.svg",
       price: "349 Birr",
-      description: "Comprehensive biology course covering cell structure, genetics, and ecosystem dynamics."
+      description: "Essential biology concepts including cell biology, genetics, evolution, and human anatomy."
     },
     {
       id: 5,
-      title: "Advanced Chemistry",
+      title: "Chemistry Grade 11",
       instructor: "Prof. Sara Getachew",
       category: "science",
       level: "Advanced",
@@ -100,11 +101,11 @@ const Courses = () => {
       rating: 4.9,
       image: "/placeholder.svg",
       price: "499 Birr",
-      description: "Advanced chemistry course for preparing for university entrance exams."
+      description: "Advanced chemistry covering organic chemistry, chemical reactions, and laboratory techniques."
     },
     {
       id: 6,
-      title: "Geography of Ethiopia",
+      title: "Ethiopian Geography",
       instructor: "Mr. Tekle Wolde",
       category: "geography",
       level: "Intermediate",
@@ -113,46 +114,85 @@ const Courses = () => {
       rating: 4.6,
       image: "/placeholder.svg",
       price: "399 Birr",
-      description: "Comprehensive geography course focusing on Ethiopian landscapes, climate, and regions."
+      description: "Study of Ethiopian geography including physical features, climate patterns, and regional development."
     },
     {
       id: 7,
-      title: "Amharic Literature",
+      title: "Amharic Literature Grade 9",
       instructor: "Dr. Almaz Tesfaye",
       category: "amharic",
-      level: "Advanced",
+      level: "Intermediate",
       duration: "10 weeks",
       students: 1243,
       rating: 4.7,
       image: "/placeholder.svg",
       price: "549 Birr",
-      description: "Advanced Amharic literature course covering classical and modern Ethiopian literature."
+      description: "Explore classical and modern Amharic literature, poetry, and creative writing techniques."
     },
     {
       id: 8,
-      title: "Physics Concepts",
+      title: "Physics Grade 11",
       instructor: "Prof. Yonas Bekele",
       category: "science",
-      level: "Intermediate",
+      level: "Advanced",
       duration: "7 weeks",
       students: 876,
       rating: 4.5,
       image: "/placeholder.svg",
       price: "429 Birr",
-      description: "Essential physics concepts including mechanics, electricity, and magnetism."
+      description: "Advanced physics concepts including mechanics, thermodynamics, and electromagnetic theory."
     },
     {
       id: 9,
-      title: "Advanced Mathematics",
+      title: "Mathematics Grade 9",
       instructor: "Dr. Meseret Hailu",
       category: "mathematics",
-      level: "Advanced",
-      duration: "12 weeks",
-      students: 654,
-      rating: 4.9,
+      level: "Intermediate",
+      duration: "6 weeks",
+      students: 2654,
+      rating: 4.6,
       image: "/placeholder.svg",
-      price: "699 Birr",
-      description: "Advanced mathematics course for university preparation including calculus and statistics."
+      price: "299 Birr",
+      description: "Essential mathematics for Grade 9 including algebra, geometry, and basic statistics."
+    },
+    {
+      id: 10,
+      title: "Social Studies Grade 8",
+      instructor: "Mr. Girma Tadesse",
+      category: "social-studies",
+      level: "Beginner",
+      duration: "8 weeks",
+      students: 1987,
+      rating: 4.4,
+      image: "/placeholder.svg",
+      price: "249 Birr",
+      description: "Introduction to Ethiopian society, government, economics, and civic responsibilities."
+    },
+    {
+      id: 11,
+      title: "English Grammar Fundamentals",
+      instructor: "Ms. Rahel Mekonnen",
+      category: "english",
+      level: "Beginner",
+      duration: "4 weeks",
+      students: 3210,
+      rating: 4.5,
+      image: "/placeholder.svg",
+      price: "149 Birr",
+      description: "Master English grammar basics including tenses, sentence structure, and punctuation."
+    },
+    {
+      id: 12,
+      title: "Environmental Science",
+      instructor: "Dr. Tsegaye Wolde",
+      category: "science",
+      level: "Beginner",
+      duration: "5 weeks",
+      students: 1456,
+      rating: 4.3,
+      image: "/placeholder.svg",
+      price: "299 Birr",
+      description: "Study of environmental systems, conservation, and sustainable development in Ethiopia."
     }
   ];
 
@@ -194,13 +234,13 @@ const Courses = () => {
             <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
-            <a href="/" className="text-gray-600 hover:text-emerald-600 transition-colors">Home</a>
-            <a href="/courses" className="text-emerald-600 font-medium">Courses</a>
-            <a href="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">About</a>
-            <a href="/contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</a>
+            <Link to="/" className="text-gray-600 hover:text-emerald-600 transition-colors">Home</Link>
+            <Link to="/courses" className="text-emerald-600 font-medium">Courses</Link>
+            <Link to="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">About</Link>
+            <Link to="/contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</Link>
           </div>
-          <Button onClick={() => window.location.href = "/"} variant="outline">
-            Back to Home
+          <Button asChild variant="outline">
+            <Link to="/">Back to Home</Link>
           </Button>
         </div>
       </header>
@@ -209,10 +249,10 @@ const Courses = () => {
       <section className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-            All Courses
+            Educational Courses
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Discover our comprehensive collection of safety courses designed to help you excel in your safety career.
+            Discover our comprehensive collection of educational courses designed for Ethiopian students following the national curriculum.
           </p>
         </div>
 

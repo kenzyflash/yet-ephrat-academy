@@ -7,9 +7,10 @@ import NotificationButton from "@/components/dashboard/NotificationButton";
 interface DashboardHeaderProps {
   title: string;
   showSettings?: boolean;
+  onSettingsClick?: () => void;
 }
 
-const DashboardHeader = ({ title, showSettings = false }: DashboardHeaderProps) => {
+const DashboardHeader = ({ title, showSettings = false, onSettingsClick }: DashboardHeaderProps) => {
   return (
     <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -19,8 +20,8 @@ const DashboardHeader = ({ title, showSettings = false }: DashboardHeaderProps) 
         </div>
         <div className="flex items-center space-x-4">
           <NotificationButton />
-          {showSettings && (
-            <Button variant="ghost" size="sm">
+          {showSettings && onSettingsClick && (
+            <Button variant="ghost" size="sm" onClick={onSettingsClick}>
               <Settings className="h-5 w-5" />
             </Button>
           )}

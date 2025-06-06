@@ -30,6 +30,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import CourseEnrollment from "@/components/dashboard/CourseEnrollment";
+import CertificateGenerator from "@/components/dashboard/CertificateGenerator";
 import { useCourseData } from "@/hooks/useCourseData";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { useToast } from "@/hooks/use-toast";
@@ -68,13 +69,16 @@ const StudentDashboard = () => {
     currentGoals, 
     streak, 
     updateWeeklyGoals,
-    refetchProgress 
+    refetchProgress,
+    logStudySession
   } = useStudentProgress();
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
       fetchAssignments();
+      // Log a study session when user visits dashboard
+      logStudySession(15); // 15 minutes for visiting dashboard
     }
   }, [user]);
 
@@ -115,6 +119,14 @@ const StudentDashboard = () => {
     if (!user) return;
 
     try {
+      // Get enrolled course IDs
+      const enrolledCourseIds = enrollments.map(e => e.course_id);
+      
+      if (enrolledCourseIds.length === 0) {
+        setAssignments([]);
+        return;
+      }
+
       // Get assignments for enrolled courses
       const { data: assignmentData, error } = await supabase
         .from('assignments')
@@ -126,7 +138,7 @@ const StudentDashboard = () => {
             title
           )
         `)
-        .in('course_id', enrollments.map(e => e.course_id))
+        .in('course_id', enrolledCourseIds)
         .order('due_date', { ascending: true });
 
       if (error) throw error;
@@ -183,23 +195,27 @@ const StudentDashboard = () => {
   const getWeeklyProgress = () => {
     if (!currentGoals) return { studyHours: 0, lessons: 0, assignments: 0 };
 
-    const thisWeek = studySessions.filter(session => {
+    // Get current week's sessions
+    const today = new Date();
+    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+    
+    const thisWeekSessions = studySessions.filter(session => {
       const sessionDate = new Date(session.date);
-      const today = new Date();
-      const weekStart = new Date(today.setDate(today.getDate() - today.getDay()));
       return sessionDate >= weekStart;
     });
 
-    const totalMinutes = thisWeek.reduce((sum, session) => sum + session.minutes_studied, 0);
+    const totalMinutes = thisWeekSessions.reduce((sum, session) => sum + session.minutes_studied, 0);
     const studyHours = Math.floor(totalMinutes / 60);
 
-    // For demo purposes, using placeholder values for lessons and assignments
-    const lessons = Math.min(currentGoals.lessons_goal, Math.floor(studyHours * 1.5));
+    // Calculate lessons completed this week (simplified)
+    const lessonsCompleted = Math.min(Math.floor(studyHours / 2), currentGoals.lessons_goal);
+    
+    // Get assignments completed
     const assignmentsCompleted = assignments.filter(a => a.status === 'submitted').length;
 
     return {
       studyHours: Math.min(studyHours, currentGoals.study_hours_goal),
-      lessons,
+      lessons: lessonsCompleted,
       assignments: Math.min(assignmentsCompleted, currentGoals.assignments_goal)
     };
   };
@@ -241,10 +257,20 @@ const StudentDashboard = () => {
   const enrolledCourses = getEnrolledCourses();
   const weeklyProgress = getWeeklyProgress();
 
+  // Calculate total study time in hours
+  const totalStudyMinutes = studySessions.reduce((sum, s) => sum + s.minutes_studied, 0);
+  const totalStudyHours = Math.floor(totalStudyMinutes / 60);
+
+  // Calculate completed courses
+  const completedCourses = enrolledCourses.filter(course => {
+    const enrollment = enrollments.find(e => e.course_id === course.id);
+    return enrollment && enrollment.progress >= 100;
+  });
+
   const stats = [
     { label: "Courses Enrolled", value: enrolledCourses.length.toString(), icon: BookOpen, color: "text-blue-600" },
-    { label: "Hours Studied", value: Math.floor(studySessions.reduce((sum, s) => sum + s.minutes_studied, 0) / 60).toString(), icon: Clock, color: "text-green-600" },
-    { label: "Certificates Earned", value: "1", icon: Award, color: "text-purple-600" },
+    { label: "Hours Studied", value: totalStudyHours.toString(), icon: Clock, color: "text-green-600" },
+    { label: "Certificates Earned", value: completedCourses.length.toString(), icon: Award, color: "text-purple-600" },
     { label: "Current Streak", value: `${streak} days`, icon: TrendingUp, color: "text-orange-600" }
   ];
 
@@ -299,10 +325,11 @@ const StudentDashboard = () => {
 
           {/* Main Content with Tabs */}
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="courses">Browse Courses</TabsTrigger>
               <TabsTrigger value="achievements">Achievements</TabsTrigger>
+              <TabsTrigger value="certificates">Certificates</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
@@ -515,8 +542,8 @@ const StudentDashboard = () => {
                     {[
                       { id: 1, title: "First Course Enrolled", icon: Trophy, earned: enrolledCourses.length > 0 },
                       { id: 2, title: "Study Streak (7 days)", icon: TrendingUp, earned: streak >= 7 },
-                      { id: 3, title: "Course Completed", icon: CheckCircle, earned: false },
-                      { id: 4, title: "Community Helper", icon: MessageSquare, earned: false }
+                      { id: 3, title: "Course Completed", icon: CheckCircle, earned: completedCourses.length > 0 },
+                      { id: 4, title: "Study Champion (100 hours)", icon: Clock, earned: totalStudyHours >= 100 }
                     ].map((achievement) => (
                       <div 
                         key={achievement.id} 
@@ -538,6 +565,10 @@ const StudentDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="certificates">
+              <CertificateGenerator />
             </TabsContent>
           </Tabs>
         </div>

@@ -60,20 +60,36 @@ export const useStudentProgress = () => {
 
     let streakCount = 0;
     const today = new Date();
-    let currentDate = new Date(today);
-
-    // Start from today and go backwards
-    for (let i = 0; i < sessions.length; i++) {
-      const sessionDate = new Date(sessions[i].date);
-      const currentDateStr = currentDate.toISOString().split('T')[0];
-      const sessionDateStr = sessionDate.toISOString().split('T')[0];
-
-      if (currentDateStr === sessionDateStr) {
-        streakCount++;
-        currentDate.setDate(currentDate.getDate() - 1);
-      } else {
-        // If we find a gap, break the streak
-        break;
+    const sortedSessions = sessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // Get unique dates
+    const uniqueDates = [...new Set(sortedSessions.map(s => s.date))];
+    
+    // Check if studied today or yesterday to start counting
+    const todayStr = today.toISOString().split('T')[0];
+    const yesterdayStr = new Date(today.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    let startIndex = -1;
+    if (uniqueDates.includes(todayStr)) {
+      startIndex = 0;
+    } else if (uniqueDates.includes(yesterdayStr)) {
+      startIndex = uniqueDates.indexOf(yesterdayStr);
+    }
+    
+    if (startIndex >= 0) {
+      // Count consecutive days
+      let currentDate = new Date(uniqueDates[startIndex]);
+      
+      for (let i = startIndex; i < uniqueDates.length; i++) {
+        const sessionDate = new Date(uniqueDates[i]);
+        const expectedDateStr = currentDate.toISOString().split('T')[0];
+        
+        if (sessionDate.toISOString().split('T')[0] === expectedDateStr) {
+          streakCount++;
+          currentDate.setDate(currentDate.getDate() - 1);
+        } else {
+          break;
+        }
       }
     }
 
@@ -86,15 +102,35 @@ export const useStudentProgress = () => {
     const today = new Date().toISOString().split('T')[0];
 
     try {
-      const { error } = await supabase
+      // Check if there's already a session for today
+      const { data: existingSession } = await supabase
         .from('study_sessions')
-        .upsert({
-          user_id: user.id,
-          date: today,
-          minutes_studied: minutesStudied
-        });
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .single();
 
-      if (error) throw error;
+      if (existingSession) {
+        // Update existing session
+        const { error } = await supabase
+          .from('study_sessions')
+          .update({ minutes_studied: existingSession.minutes_studied + minutesStudied })
+          .eq('id', existingSession.id);
+        
+        if (error) throw error;
+      } else {
+        // Create new session
+        const { error } = await supabase
+          .from('study_sessions')
+          .insert({
+            user_id: user.id,
+            date: today,
+            minutes_studied: minutesStudied
+          });
+
+        if (error) throw error;
+      }
+
       await fetchStudySessions();
     } catch (error) {
       console.error('Error logging study session:', error);
@@ -114,7 +150,7 @@ export const useStudentProgress = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('week_start_date', weekStartStr)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       setCurrentGoals(data);

@@ -1,54 +1,19 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  BookOpen, 
-  Users, 
-  GraduationCap, 
-  Star, 
-  Play, 
-  ArrowRight,
-  CheckCircle,
-  Globe,
-  Zap,
-  Heart
-} from "lucide-react";
+import { BookOpen, GraduationCap, Users, Award, Play, Star, CheckCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
-import CourseSearch from "@/components/CourseSearch";
 import Footer from "@/components/Footer";
-import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [featuredCourses, setFeaturedCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-
-  useEffect(() => {
-    fetchFeaturedCourses();
-  }, []);
-
-  const fetchFeaturedCourses = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select('*')
-        .order('student_count', { ascending: false })
-        .limit(3);
-
-      if (error) throw error;
-      setFeaturedCourses(data || []);
-    } catch (error) {
-      console.error('Error fetching featured courses:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSwitchToRegister = () => {
     setShowLogin(false);
@@ -60,56 +25,53 @@ const Index = () => {
     setShowLogin(true);
   };
 
-  const handleEnrollClick = () => {
-    if (user) {
-      window.location.href = "/student-dashboard";
-    } else {
-      setShowRegister(true);
-    }
-  };
-
-  const stats = [
-    { icon: Users, label: "Active Students", value: "10,000+" },
-    { icon: BookOpen, label: "Courses Available", value: "500+" },
-    { icon: GraduationCap, label: "Expert Instructors", value: "200+" },
-    { icon: Star, label: "Student Rating", value: "4.9/5" }
-  ];
-
   const features = [
     {
       icon: BookOpen,
-      title: "Quality Education",
-      description: "Comprehensive curriculum designed by Ethiopian education experts with culturally relevant content."
+      title: "Comprehensive Curriculum",
+      description: "Ethiopian curriculum-aligned courses covering all subjects from Grade 1 to 12, including Mathematics, Science, English, Amharic, and Social Studies."
     },
     {
-      icon: Zap,
-      title: "Interactive Learning",
-      description: "Engaging multimedia content, interactive exercises, and hands-on learning experiences."
+      icon: GraduationCap,
+      title: "Expert Ethiopian Educators",
+      description: "Learn from qualified Ethiopian teachers and education experts who understand the local curriculum and learning needs."
     },
     {
-      icon: Heart,
-      title: "Community Support",
-      description: "Connect with fellow Ethiopian students and teachers in a supportive learning environment."
+      icon: Users,
+      title: "Interactive Learning Community",
+      description: "Connect with fellow Ethiopian students, participate in discussions, and collaborate on assignments in a supportive learning environment."
+    },
+    {
+      icon: Award,
+      title: "Certified Progress Tracking",
+      description: "Earn certificates upon course completion and track your academic progress with detailed analytics and performance reports."
     }
+  ];
+
+  const stats = [
+    { number: "10,000+", label: "Ethiopian Students" },
+    { number: "500+", label: "Educational Courses" },
+    { number: "100+", label: "Certified Teachers" },
+    { number: "98%", label: "Success Rate" }
   ];
 
   const testimonials = [
     {
-      name: "Abebe Kebede",
-      role: "High School Student",
-      content: "SafHub helped me improve my grades significantly. The teachers are amazing!",
+      name: "Meron Tadesse",
+      grade: "Grade 12 Student",
+      content: "SafHub helped me excel in my university entrance exams. The Mathematics and Science courses are excellent!",
       rating: 5
     },
     {
-      name: "Dr. Meron Asefa",
-      role: "Teacher",
-      content: "As an instructor, I love how engaged students become with this platform.",
+      name: "Dawit Alemayehu",
+      grade: "Grade 10 Student", 
+      content: "The English language courses improved my communication skills significantly. Highly recommended!",
       rating: 5
     },
     {
-      name: "Hanna Tadesse",
-      role: "University Student",
-      content: "I can finally pursue my education while managing my other responsibilities.",
+      name: "Hanna Bekele",
+      grade: "Grade 9 Student",
+      content: "I love the interactive lessons and the way teachers explain complex topics in simple terms.",
       rating: 5
     }
   ];
@@ -124,14 +86,14 @@ const Index = () => {
             <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
           </div>
           <div className="hidden md:flex items-center space-x-6">
-            <a href="/" className="text-emerald-600 font-medium">Home</a>
-            <a href="/courses" className="text-gray-600 hover:text-emerald-600 transition-colors">Courses</a>
-            <a href="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">About</a>
-            <a href="/contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</a>
+            <Link to="/" className="text-emerald-600 font-medium">Home</Link>
+            <Link to="/courses" className="text-gray-600 hover:text-emerald-600 transition-colors">Courses</Link>
+            <Link to="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">About</Link>
+            <Link to="/contact" className="text-gray-600 hover:text-emerald-600 transition-colors">Contact</Link>
           </div>
           <div className="flex items-center space-x-4">
             {user ? (
-              <Button onClick={() => window.location.href = "/student-dashboard"} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button onClick={() => window.location.href = user.user_metadata?.role === 'admin' ? '/admin-dashboard' : user.user_metadata?.role === 'teacher' ? '/teacher-dashboard' : '/student-dashboard'}>
                 Dashboard
               </Button>
             ) : (
@@ -139,7 +101,7 @@ const Index = () => {
                 <Button variant="ghost" onClick={() => setShowLogin(true)}>
                   Sign In
                 </Button>
-                <Button onClick={() => setShowRegister(true)} className="bg-emerald-600 hover:bg-emerald-700">
+                <Button onClick={() => setShowRegister(true)}>
                   Get Started
                 </Button>
               </>
@@ -150,206 +112,171 @@ const Index = () => {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20">
-        <div className="text-center max-w-4xl mx-auto">
+        <div className="text-center mb-16">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-6">
-            Learn, Grow, and Excel with
-            <span className="text-emerald-600"> SafHub</span>
+            Master Ethiopian Education with
+            <span className="text-emerald-600 block">SafHub Learning</span>
           </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Join thousands of Ethiopian students in our interactive online learning platform. 
-            Master your subjects, advance your education, and achieve your academic goals.
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+            Comprehensive online learning platform designed for Ethiopian students. Access quality education aligned with the national curriculum, taught by expert educators.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              onClick={handleEnrollClick}
-              size="lg" 
-              className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3"
-            >
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => setShowRegister(true)}>
               Start Learning Today
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-3">
-              <Play className="mr-2 h-5 w-5" />
-              Watch Demo
+            <Button size="lg" variant="outline" asChild>
+              <Link to="/courses">Browse Courses</Link>
             </Button>
           </div>
         </div>
-      </section>
 
-      {/* Stats Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-20">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
-              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-                <stat.icon className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
-                <div className="text-3xl font-bold text-gray-800 mb-2">{stat.value}</div>
-                <div className="text-gray-600">{stat.label}</div>
-              </div>
+              <div className="text-3xl md:text-4xl font-bold text-emerald-600 mb-2">{stat.number}</div>
+              <div className="text-gray-600">{stat.label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            Why Choose SafHub?
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            We're committed to providing the best educational experience for Ethiopian students.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
-            <Card key={index} className="text-center bg-white/80 backdrop-blur-sm hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <feature.icon className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
-                <CardTitle className="text-xl text-gray-800">{feature.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-gray-600">
-                  {feature.description}
-                </CardDescription>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* Featured Courses Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            Featured Courses
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Discover our most popular courses designed by expert Ethiopian educators.
-          </p>
-        </div>
-        
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="text-gray-600">Loading courses...</div>
+      {/* Why Choose SafHub Section */}
+      <section className="bg-white/80 backdrop-blur-sm py-20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-800 mb-4">Why Choose SafHub?</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Discover what makes SafHub the leading educational platform for Ethiopian students
+            </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            {featuredCourses.map((course) => (
-              <Card key={course.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
-                <div className="relative">
-                  <img 
-                    src={course.image_url || "/placeholder.svg"} 
-                    alt={course.title}
-                    className="w-full h-48 object-cover rounded-t-lg"
-                  />
-                  <Badge className="absolute top-3 left-3 bg-emerald-600 text-white">
-                    {course.level || 'All Levels'}
-                  </Badge>
-                  <Badge variant="secondary" className="absolute top-3 right-3">
-                    {course.price || 'Free'}
-                  </Badge>
-                </div>
-                <CardHeader>
-                  <CardTitle className="text-xl text-gray-800">{course.title}</CardTitle>
-                  <CardDescription className="text-gray-600">
-                    by {course.instructor_name}
-                  </CardDescription>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {features.map((feature, index) => (
+              <Card key={index} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-2 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="text-center">
+                  <feature.icon className="h-12 w-12 text-emerald-600 mx-auto mb-4" />
+                  <CardTitle className="text-xl text-gray-800">{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <span className="flex items-center">
-                      <Users className="h-4 w-4 mr-1" />
-                      {(course.student_count || 0).toLocaleString()} students
-                    </span>
-                    <span className="flex items-center">
-                      <Star className="h-4 w-4 mr-1 fill-yellow-400 text-yellow-400" />
-                      {course.rating || 0}
-                    </span>
-                  </div>
-                  <Button onClick={handleEnrollClick} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                    <Play className="mr-2 h-4 w-4" />
-                    Enroll Now
-                  </Button>
+                  <CardDescription className="text-gray-600 text-center">
+                    {feature.description}
+                  </CardDescription>
                 </CardContent>
               </Card>
             ))}
           </div>
-        )}
-        
+        </div>
+      </section>
+
+      {/* Featured Courses */}
+      <section className="container mx-auto px-4 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-gray-800 mb-4">Featured Courses</h2>
+          <p className="text-xl text-gray-600">Popular courses aligned with Ethiopian curriculum</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          {[
+            {
+              title: "Mathematics Grade 12",
+              instructor: "Dr. Meron Asefa",
+              students: "2,400",
+              rating: 4.9,
+              image: "/placeholder.svg",
+              level: "Advanced"
+            },
+            {
+              title: "Ethiopian History",
+              instructor: "Prof. Abebe Kebede",
+              students: "1,800",
+              rating: 4.8,
+              image: "/placeholder.svg",
+              level: "Intermediate"
+            },
+            {
+              title: "English Language Skills",
+              instructor: "Ms. Hanna Tadesse",
+              students: "3,200",
+              rating: 4.7,
+              image: "/placeholder.svg",
+              level: "All Levels"
+            }
+          ].map((course, index) => (
+            <Card key={index} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+              <div className="relative">
+                <img src={course.image} alt={course.title} className="w-full h-48 object-cover rounded-t-lg" />
+                <Badge className="absolute top-3 left-3 bg-emerald-600 text-white">{course.level}</Badge>
+              </div>
+              <CardHeader>
+                <CardTitle className="text-xl text-gray-800">{course.title}</CardTitle>
+                <CardDescription>by {course.instructor}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                  <span>{course.students} students</span>
+                  <div className="flex items-center">
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
+                    {course.rating}
+                  </div>
+                </div>
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700" asChild>
+                  <Link to="/courses">
+                    <Play className="mr-2 h-4 w-4" />
+                    Start Learning
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
         <div className="text-center">
-          <Button variant="outline" size="lg" onClick={() => window.location.href = "/courses"}>
-            View All Courses
-            <ArrowRight className="ml-2 h-5 w-5" />
+          <Button variant="outline" size="lg" asChild>
+            <Link to="/courses">View All Courses</Link>
           </Button>
         </div>
       </section>
 
-      {/* Explore Our Courses Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            Explore Our Courses
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Search through our extensive catalog of educational courses to find the perfect fit for your learning goals.
-          </p>
-        </div>
-        <CourseSearch />
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-            What Our Students Say
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Join thousands of satisfied learners who have enhanced their education through our platform.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => (
-            <Card key={index} className="bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <div className="flex items-center space-x-1 mb-2">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <CardDescription className="text-gray-600 italic">
-                  "{testimonial.content}"
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="font-semibold text-gray-800">{testimonial.name}</div>
-                <div className="text-sm text-gray-500">{testimonial.role}</div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Testimonials */}
+      <section className="bg-white/80 backdrop-blur-sm py-20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-800 mb-4">What Students Say</h2>
+            <p className="text-xl text-gray-600">Real feedback from Ethiopian students using SafHub</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, index) => (
+              <Card key={index} className="bg-white/80 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center mb-4">
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-gray-600 mb-4">"{testimonial.content}"</p>
+                  <div>
+                    <p className="font-semibold text-gray-800">{testimonial.name}</p>
+                    <p className="text-sm text-gray-500">{testimonial.grade}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-20">
-        <div className="bg-gradient-to-r from-emerald-600 to-blue-600 rounded-2xl p-8 md:p-16 text-center text-white">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Start Your Learning Journey?
-          </h2>
-          <p className="text-xl mb-8 opacity-90 max-w-2xl mx-auto">
-            Join SafHub today and unlock your potential with our comprehensive educational courses.
+        <div className="bg-gradient-to-r from-emerald-600 to-blue-600 rounded-2xl p-12 text-center text-white">
+          <h2 className="text-4xl font-bold mb-4">Ready to Start Your Learning Journey?</h2>
+          <p className="text-xl mb-8 opacity-90">
+            Join thousands of Ethiopian students who are already achieving their academic goals with SafHub
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              onClick={handleEnrollClick}
-              size="lg" 
-              className="bg-white text-emerald-600 hover:bg-gray-100 text-lg px-8 py-3"
-            >
-              <CheckCircle className="mr-2 h-5 w-5" />
-              Start Learning Now
+            <Button size="lg" variant="secondary" onClick={() => setShowRegister(true)}>
+              Create Free Account
             </Button>
-            <Button variant="outline" size="lg" className="border-white text-white hover:bg-white hover:text-emerald-600 text-lg px-8 py-3">
-              Learn More About Us
+            <Button size="lg" variant="outline" className="text-white border-white hover:bg-white hover:text-emerald-600" asChild>
+              <Link to="/courses">Explore Courses</Link>
             </Button>
           </div>
         </div>
