@@ -61,12 +61,12 @@ const Contact = () => {
     {
       icon: MapPin,
       title: "Visit Us",
-      details: ["Safety Training Center", "Industrial District"]
+      details: ["Education Center", "Addis Ababa, Ethiopia"]
     },
     {
       icon: Phone,
       title: "Call Us",
-      details: ["+1 (555) 123-4567", "+1 (555) 234-5678"]
+      details: ["+251 (911) 123-456", "+251 (922) 234-567"]
     },
     {
       icon: Mail,
@@ -108,7 +108,7 @@ const Contact = () => {
             Get in Touch
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Have questions about our safety courses or need support? We're here to help you succeed in your safety training journey.
+            Have questions about our courses or need support? We're here to help you succeed in your educational journey.
           </p>
         </div>
 
@@ -229,16 +229,16 @@ const Contact = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium text-gray-800 mb-1">How do I enroll in a safety course?</h4>
-                  <p className="text-sm text-gray-600">Simply create an account and browse our safety course catalog to get started.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">How do I enroll in a course?</h4>
+                  <p className="text-sm text-gray-600">Simply create an account and browse our course catalog to get started.</p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-800 mb-1">Are safety certificates provided?</h4>
-                  <p className="text-sm text-gray-600">Yes, you'll receive a certificate upon successful completion of any safety course.</p>
+                  <h4 className="font-medium text-gray-800 mb-1">Are certificates provided?</h4>
+                  <p className="text-sm text-gray-600">Yes, you'll receive a certificate upon successful completion of any course.</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-800 mb-1">What payment methods do you accept?</h4>
-                  <p className="text-sm text-gray-600">We accept various payment methods including credit cards and corporate accounts.</p>
+                  <p className="text-sm text-gray-600">We accept various payment methods including mobile money and bank transfers.</p>
                 </div>
               </CardContent>
             </Card>

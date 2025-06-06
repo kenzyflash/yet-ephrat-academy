@@ -75,12 +75,15 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
         .insert({
           course_id: courseId,
           title: newAssignment.title,
-          description: newAssignment.description,
+          description: newAssignment.description || '',
           due_date: newAssignment.due_date,
           created_by: user.id
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       await fetchAssignments();
       setNewAssignment({ title: '', description: '', due_date: '' });
@@ -90,11 +93,11 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
         title: "Assignment created",
         description: "Your new assignment has been added successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating assignment:', error);
       toast({
         title: "Error",
-        description: "Failed to create assignment. Please try again.",
+        description: `Failed to create assignment: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -123,11 +126,11 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
         title: "Assignment updated",
         description: "Assignment details have been updated successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating assignment:', error);
       toast({
         title: "Error",
-        description: "Failed to update assignment. Please try again.",
+        description: `Failed to update assignment: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -147,11 +150,11 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
         title: "Assignment deleted",
         description: "The assignment has been removed.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting assignment:', error);
       toast({
         title: "Error",
-        description: "Failed to delete assignment. Please try again.",
+        description: `Failed to delete assignment: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -198,7 +201,7 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Assignment Title</label>
+                  <label className="text-sm font-medium">Assignment Title *</label>
                   <Input
                     value={newAssignment.title}
                     onChange={(e) => setNewAssignment({ ...newAssignment, title: e.target.value })}
@@ -215,7 +218,7 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Due Date</label>
+                  <label className="text-sm font-medium">Due Date *</label>
                   <Input
                     type="datetime-local"
                     value={newAssignment.due_date}

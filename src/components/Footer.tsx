@@ -13,7 +13,7 @@ const Footer = () => {
               <h3 className="text-2xl font-bold">SafHub</h3>
             </div>
             <p className="text-gray-300 text-sm">
-              Empowering safety professionals with quality training and modern learning tools for a safer future.
+              Empowering Ethiopian students with quality education and modern learning tools for a brighter future.
             </p>
             <div className="flex space-x-4">
               <Facebook className="h-5 w-5 text-gray-400 hover:text-emerald-400 cursor-pointer transition-colors" />
@@ -37,10 +37,10 @@ const Footer = () => {
           <div className="space-y-4">
             <h4 className="text-lg font-semibold">Popular Courses</h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Workplace Safety</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Fire Safety</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Industrial Safety</a></li>
-              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Risk Management</a></li>
+              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Mathematics</a></li>
+              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Science</a></li>
+              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">English</a></li>
+              <li><a href="#" className="text-gray-300 hover:text-emerald-400 transition-colors">Social Studies</a></li>
             </ul>
           </div>
 
@@ -50,11 +50,11 @@ const Footer = () => {
             <div className="space-y-3 text-sm">
               <div className="flex items-center space-x-2">
                 <MapPin className="h-4 w-4 text-emerald-400" />
-                <span className="text-gray-300">Safety Training Center</span>
+                <span className="text-gray-300">Education Center, Addis Ababa</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Phone className="h-4 w-4 text-emerald-400" />
-                <span className="text-gray-300">+1 (555) 123-4567</span>
+                <span className="text-gray-300">+251 (911) 123-456</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Mail className="h-4 w-4 text-emerald-400" />

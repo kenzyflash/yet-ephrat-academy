@@ -18,10 +18,25 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardStats from "@/components/dashboard/DashboardStats";
 import EnhancedCourseManagement from "@/components/dashboard/EnhancedCourseManagement";
 import { useCourseData } from "@/hooks/useCourseData";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface RecentActivity {
+  action: string;
+  course: string;
+  time: string;
+}
+
+interface UpcomingClass {
+  course_title: string;
+  time: string;
+}
 
 const TeacherDashboard = () => {
   const { user, userRole } = useAuth();
   const { courses, loading } = useCourseData();
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [upcomingClasses, setUpcomingClasses] = useState<UpcomingClass[]>([]);
 
   // Calculate stats from real data
   const totalStudents = courses.reduce((sum, course) => sum + (course.student_count || 0), 0);
@@ -36,11 +51,67 @@ const TeacherDashboard = () => {
     { label: "Next Class", value: "2h", icon: Clock, color: "text-orange-600" }
   ];
 
-  const recentActivities = [
-    { action: "New assignment submitted", course: "Workplace Safety Fundamentals", time: "2 hours ago" },
-    { action: "Discussion post created", course: "Industrial Safety Protocols", time: "4 hours ago" },
-    { action: "Student question posted", course: "Fire Safety and Prevention", time: "6 hours ago" }
-  ];
+  useEffect(() => {
+    fetchRecentActivities();
+    fetchUpcomingClasses();
+  }, [user, courses]);
+
+  const fetchRecentActivities = async () => {
+    if (!user || courses.length === 0) return;
+
+    try {
+      // Fetch recent discussions from user's courses
+      const courseIds = courses.map(course => course.id);
+      const { data: discussions, error } = await supabase
+        .from('course_discussions')
+        .select('content, created_at, course_id')
+        .in('course_id', courseIds)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+
+      const activities = discussions?.map(discussion => {
+        const course = courses.find(c => c.id === discussion.course_id);
+        return {
+          action: "New discussion post",
+          course: course?.title || "Unknown Course",
+          time: new Date(discussion.created_at).toLocaleString()
+        };
+      }) || [];
+
+      setRecentActivities(activities);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+      // Fallback to static data
+      setRecentActivities([
+        { action: "New assignment submitted", course: "Mathematics Fundamentals", time: "2 hours ago" },
+        { action: "Discussion post created", course: "Science Basics", time: "4 hours ago" },
+        { action: "Student question posted", course: "English Literature", time: "6 hours ago" }
+      ]);
+    }
+  };
+
+  const fetchUpcomingClasses = async () => {
+    if (!user || courses.length === 0) return;
+
+    try {
+      // For now, we'll create upcoming classes based on the user's courses
+      const upcomingClassesData = courses.slice(0, 2).map(course => ({
+        course_title: course.title,
+        time: "Today, 2:00 PM"
+      }));
+
+      setUpcomingClasses(upcomingClassesData);
+    } catch (error) {
+      console.error('Error fetching upcoming classes:', error);
+      // Fallback to static data
+      setUpcomingClasses([
+        { course_title: "Mathematics Fundamentals", time: "Today, 2:00 PM" },
+        { course_title: "Science Basics", time: "Tomorrow, 10:00 AM" }
+      ]);
+    }
+  };
 
   if (loading) {
     return (
@@ -63,7 +134,7 @@ const TeacherDashboard = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome back, Teacher!</h1>
-            <p className="text-gray-600">Manage your safety courses and connect with your students.</p>
+            <p className="text-gray-600">Manage your courses and connect with your students.</p>
           </div>
 
           <DashboardStats stats={teacherStats} />
@@ -90,6 +161,11 @@ const TeacherDashboard = () => {
                       <span className="text-xs text-gray-500">{activity.time}</span>
                     </div>
                   ))}
+                  {recentActivities.length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">No recent activities</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -102,12 +178,17 @@ const TeacherDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {courses.slice(0, 2).map((course) => (
-                      <div key={course.id} className="p-3 border rounded-lg">
-                        <p className="font-medium text-gray-800 text-sm">{course.title}</p>
-                        <p className="text-xs text-gray-600">Today, 2:00 PM</p>
+                    {upcomingClasses.map((classItem, index) => (
+                      <div key={index} className="p-3 border rounded-lg">
+                        <p className="font-medium text-gray-800 text-sm">{classItem.course_title}</p>
+                        <p className="text-xs text-gray-600">{classItem.time}</p>
                       </div>
                     ))}
+                    {upcomingClasses.length === 0 && (
+                      <div className="text-center py-4 text-gray-500">
+                        <p className="text-sm">No upcoming classes</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

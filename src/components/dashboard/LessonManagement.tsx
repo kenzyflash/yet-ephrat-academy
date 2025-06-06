@@ -81,13 +81,16 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
         .insert({
           course_id: courseId,
           title: newLesson.title,
-          description: newLesson.description,
-          video_url: newLesson.video_url,
-          duration_minutes: newLesson.duration_minutes,
+          description: newLesson.description || '',
+          video_url: newLesson.video_url || '',
+          duration_minutes: newLesson.duration_minutes || 0,
           order_index: maxOrderIndex + 1
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       await fetchLessons();
       setNewLesson({ title: '', description: '', video_url: '', duration_minutes: 0 });
@@ -97,11 +100,11 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
         title: "Lesson created",
         description: "Your new lesson has been added successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating lesson:', error);
       toast({
         title: "Error",
-        description: "Failed to create lesson. Please try again.",
+        description: `Failed to create lesson: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -131,11 +134,11 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
         title: "Lesson updated",
         description: "Lesson details have been updated successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating lesson:', error);
       toast({
         title: "Error",
-        description: "Failed to update lesson. Please try again.",
+        description: `Failed to update lesson: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -155,11 +158,11 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
         title: "Lesson deleted",
         description: "The lesson has been removed.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting lesson:', error);
       toast({
         title: "Error",
-        description: "Failed to delete lesson. Please try again.",
+        description: `Failed to delete lesson: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -257,7 +260,7 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Lesson Title</label>
+                  <label className="text-sm font-medium">Lesson Title *</label>
                   <Input
                     value={newLesson.title}
                     onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })}
