@@ -35,9 +35,6 @@ const Header = () => {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button variant="ghost" asChild>
-              <Link to="/student-dashboard">Dashboard</Link>
-            </Button>
             <Button asChild>
               <Link to="/courses">Get Started</Link>
             </Button>
@@ -89,11 +86,6 @@ const Header = () => {
                 Contact
               </Link>
               <div className="flex flex-col space-y-2 pt-4">
-                <Button variant="ghost" asChild>
-                  <Link to="/student-dashboard" onClick={() => setIsMenuOpen(false)}>
-                    Dashboard
-                  </Link>
-                </Button>
                 <Button asChild>
                   <Link to="/courses" onClick={() => setIsMenuOpen(false)}>
                     Get Started
