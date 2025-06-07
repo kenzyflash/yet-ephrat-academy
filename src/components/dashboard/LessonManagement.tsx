@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Video, File, ArrowUp, ArrowDown, Upload } from 'lucide-react';
+import { Plus, Edit, Trash2, Video, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import VideoUploader from '@/components/enhanced/VideoUploader';
 
 interface Lesson {
   id: string;
@@ -33,7 +34,6 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   const [newLesson, setNewLesson] = useState({
     title: '',
@@ -58,6 +58,11 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
       setLessons(data || []);
     } catch (error) {
       console.error('Error fetching lessons:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch lessons",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -87,10 +92,7 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
           order_index: maxOrderIndex + 1
         });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       await fetchLessons();
       setNewLesson({ title: '', description: '', video_url: '', duration_minutes: 0 });
@@ -180,57 +182,43 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
     if (!swapLesson) return;
 
     try {
-      // Swap order indices
-      await supabase
+      // Update both lessons in a transaction-like manner
+      const { error: error1 } = await supabase
         .from('lessons')
         .update({ order_index: newOrderIndex })
         .eq('id', currentLesson.id);
 
-      await supabase
+      const { error: error2 } = await supabase
         .from('lessons')
         .update({ order_index: currentLesson.order_index })
         .eq('id', swapLesson.id);
 
+      if (error1 || error2) throw error1 || error2;
+
       await fetchLessons();
+      
+      toast({
+        title: "Lesson reordered",
+        description: "Lesson order has been updated.",
+      });
     } catch (error) {
       console.error('Error reordering lessons:', error);
-    }
-  };
-
-  const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>, lessonType: 'new' | 'edit') => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploadingVideo(true);
-    try {
-      // In a real application, you would upload to Supabase Storage
-      // For now, we'll use a placeholder URL
-      const videoUrl = `/videos/${file.name}`;
-      
-      if (lessonType === 'new') {
-        setNewLesson(prev => ({ ...prev, video_url: videoUrl }));
-      } else if (editingLesson) {
-        setEditingLesson(prev => prev ? { ...prev, video_url: videoUrl } : null);
-      }
-
       toast({
-        title: "Video uploaded",
-        description: "Video has been uploaded successfully.",
-      });
-    } catch (error) {
-      console.error('Error uploading video:', error);
-      toast({
-        title: "Upload failed",
-        description: "Failed to upload video. Please try again.",
+        title: "Error",
+        description: "Failed to reorder lesson",
         variant: "destructive"
       });
-    } finally {
-      setUploadingVideo(false);
     }
   };
 
   if (loading) {
-    return <div>Loading lessons...</div>;
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="text-center">Loading lessons...</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -239,7 +227,7 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5 text-blue-600" />
+              <BookOpen className="h-5 w-5 text-blue-600" />
               Lessons - {courseName}
             </CardTitle>
             <CardDescription>Manage course lessons and videos</CardDescription>
@@ -286,17 +274,11 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Video Upload</label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="file"
-                      accept="video/*"
-                      onChange={(e) => handleVideoUpload(e, 'new')}
-                      disabled={uploadingVideo}
-                    />
-                    {uploadingVideo && <span className="text-sm text-gray-600">Uploading...</span>}
-                  </div>
+                  <VideoUploader
+                    onUploadComplete={(url) => setNewLesson({ ...newLesson, video_url: url })}
+                  />
                   {newLesson.video_url && (
-                    <p className="text-sm text-green-600 mt-1">Video: {newLesson.video_url}</p>
+                    <p className="text-sm text-green-600 mt-1">Video uploaded successfully</p>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -328,10 +310,7 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
                     {lesson.duration_minutes} minutes
                   </span>
                   {lesson.video_url && (
-                    <span className="flex items-center gap-1 text-green-600">
-                      <File className="h-4 w-4" />
-                      Video attached
-                    </span>
+                    <span className="text-green-600">Video uploaded</span>
                   )}
                 </div>
               </div>
@@ -357,7 +336,7 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
                 </Button>
               </div>
               <div className="flex gap-2">
-                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <Dialog open={isEditDialogOpen && editingLesson?.id === lesson.id} onOpenChange={setIsEditDialogOpen}>
                   <DialogTrigger asChild>
                     <Button 
                       variant="outline" 
@@ -401,17 +380,11 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
                         </div>
                         <div>
                           <label className="text-sm font-medium">Video Upload</label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="file"
-                              accept="video/*"
-                              onChange={(e) => handleVideoUpload(e, 'edit')}
-                              disabled={uploadingVideo}
-                            />
-                            {uploadingVideo && <span className="text-sm text-gray-600">Uploading...</span>}
-                          </div>
+                          <VideoUploader
+                            onUploadComplete={(url) => setEditingLesson({ ...editingLesson, video_url: url })}
+                          />
                           {editingLesson.video_url && (
-                            <p className="text-sm text-green-600 mt-1">Video: {editingLesson.video_url}</p>
+                            <p className="text-sm text-green-600 mt-1">Current video: {editingLesson.video_url}</p>
                           )}
                         </div>
                         <div className="flex gap-2">
@@ -442,7 +415,7 @@ const LessonManagement = ({ courseId, courseName }: LessonManagementProps) => {
 
         {lessons.length === 0 && (
           <div className="text-center py-8 text-gray-500">
-            <Video className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+            <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-lg font-medium mb-2">No lessons yet</h3>
             <p>Add your first lesson to get started!</p>
           </div>

@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, FileText, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Calendar, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,12 +49,17 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
         .from('assignments')
         .select('*')
         .eq('course_id', courseId)
-        .order('created_at', { ascending: false });
+        .order('due_date', { ascending: true });
 
       if (error) throw error;
       setAssignments(data || []);
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch assignments",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -63,7 +69,7 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
     if (!newAssignment.title || !newAssignment.due_date || !user) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields.",
+        description: "Please fill in the title and due date.",
         variant: "destructive"
       });
       return;
@@ -80,10 +86,7 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
           created_by: user.id
         });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
       await fetchAssignments();
       setNewAssignment({ title: '', description: '', due_date: '' });
@@ -137,6 +140,10 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
   };
 
   const handleDeleteAssignment = async (assignmentId: string) => {
+    if (!window.confirm('Are you sure you want to delete this assignment?')) {
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('assignments')
@@ -170,8 +177,18 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
     });
   };
 
+  const isOverdue = (dueDate: string) => {
+    return new Date(dueDate) < new Date();
+  };
+
   if (loading) {
-    return <div>Loading assignments...</div>;
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="text-center">Loading assignments...</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -183,20 +200,20 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
               <FileText className="h-5 w-5 text-purple-600" />
               Assignments - {courseName}
             </CardTitle>
-            <CardDescription>Manage course assignments and deadlines</CardDescription>
+            <CardDescription>Create and manage course assignments</CardDescription>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-purple-600 hover:bg-purple-700">
                 <Plus className="mr-2 h-4 w-4" />
-                Add Assignment
+                New Assignment
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Create New Assignment</DialogTitle>
                 <DialogDescription>
-                  Add a new assignment to your course.
+                  Add a new assignment for your students.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -243,22 +260,28 @@ const AssignmentManagement = ({ courseId, courseName }: AssignmentManagementProp
           <div key={assignment.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
-                <h3 className="font-semibold text-gray-800 mb-1">{assignment.title}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-gray-800">{assignment.title}</h3>
+                  {isOverdue(assignment.due_date) && (
+                    <Badge variant="destructive">Overdue</Badge>
+                  )}
+                </div>
                 <p className="text-sm text-gray-600 mb-2">{assignment.description}</p>
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <span className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
                     Due: {formatDate(assignment.due_date)}
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
                     Created: {formatDate(assignment.created_at)}
                   </span>
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center justify-end gap-2">
-              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <div className="flex justify-end gap-2">
+              <Dialog open={isEditDialogOpen && editingAssignment?.id === assignment.id} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>
                   <Button 
                     variant="outline" 
