@@ -2,6 +2,21 @@
 
 ## Project info
 
+### Team members of this project?
+
+**Team Leader**
+Kaleab Fikru
+
+**Team Members**
+1. Fiker Ayalneh
+2. Fikir Nigusse
+3. Fison Nasir
+4. Hanan Feisel
+5. Hasset Yonas
+6. Helina Abush
+7. Hiba Jemal
+8. Husniya Kedir
+
 ## How can I edit this code?
 
 There are several ways of editing your application.
@@ -45,17 +60,3 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
-
-## Team members of this project?
-
-**Team Leader**
-Kaleab Fikru
-**Team Members**
-1. Fiker Ayalneh
-2. Fikir Nigusse
-3. Fison Nasir
-4. Hanan Feisel
-5. Hasset Yonas
-6. Helina Abush
-7. Hiba Jemal
-8. Husniya Kedir
