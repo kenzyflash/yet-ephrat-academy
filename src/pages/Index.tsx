@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -260,6 +259,32 @@ const Index = () => {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="container mx-auto px-4 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold text-gray-800 mb-4">Frequently Asked Questions</h2>
+          <p className="text-xl text-gray-600">Answers to common questions about SafHub</p>
+        </div>
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow">
+            <h3 className="font-semibold text-lg text-emerald-700 mb-2">Is SafHub free to use?</h3>
+            <p className="text-gray-700">SafHub offers free access to many courses and resources. Some advanced features or courses may require a subscription.</p>
+          </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow">
+            <h3 className="font-semibold text-lg text-emerald-700 mb-2">Who are the instructors?</h3>
+            <p className="text-gray-700">Our instructors are certified Ethiopian teachers and subject experts with years of classroom and online teaching experience.</p>
+          </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow">
+            <h3 className="font-semibold text-lg text-emerald-700 mb-2">Can I access SafHub on my phone?</h3>
+            <p className="text-gray-700">Yes! SafHub is fully responsive and works on smartphones, tablets, and computers.</p>
+          </div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg p-6 shadow">
+            <h3 className="font-semibold text-lg text-emerald-700 mb-2">How do I track my progress?</h3>
+            <p className="text-gray-700">You can track your learning progress and achievements from your dashboard after signing in.</p>
           </div>
         </div>
       </section>

@@ -117,11 +117,6 @@ const RegisterModal = ({ open, onOpenChange, onSwitchToLogin }: RegisterModalPro
               required
             />
           </div>
-
-          <RoleSelector 
-            value={formData.role} 
-            onChange={(value) => handleInputChange("role", value)} 
-          />
           
           <div className="space-y-2">
             <Label htmlFor="school">School/Institution</Label>
