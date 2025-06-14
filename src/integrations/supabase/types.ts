@@ -120,7 +120,9 @@ export type Database = {
           content: string
           course_id: string
           created_at: string
+          downvotes: number | null
           id: string
+          parent_id: string | null
           updated_at: string
           upvotes: number | null
           user_id: string
@@ -129,7 +131,9 @@ export type Database = {
           content: string
           course_id: string
           created_at?: string
+          downvotes?: number | null
           id?: string
+          parent_id?: string | null
           updated_at?: string
           upvotes?: number | null
           user_id: string
@@ -138,7 +142,9 @@ export type Database = {
           content?: string
           course_id?: string
           created_at?: string
+          downvotes?: number | null
           id?: string
+          parent_id?: string | null
           updated_at?: string
           upvotes?: number | null
           user_id?: string
@@ -149,6 +155,13 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_discussions_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "course_discussions"
             referencedColumns: ["id"]
           },
         ]
@@ -238,6 +251,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      discussion_downvotes: {
+        Row: {
+          created_at: string
+          discussion_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          discussion_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          discussion_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discussion_downvotes_discussion_id_fkey"
+            columns: ["discussion_id"]
+            isOneToOne: false
+            referencedRelation: "course_discussions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discussion_upvotes: {
         Row: {
@@ -503,6 +545,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      decrement_downvotes: {
+        Args: { discussion_id: string }
+        Returns: undefined
+      }
       decrement_upvotes: {
         Args: { discussion_id: string }
         Returns: undefined
@@ -513,6 +559,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      increment_downvotes: {
+        Args: { discussion_id: string }
+        Returns: undefined
       }
       increment_study_minutes: {
         Args: { p_user_id: string; p_date: string; p_minutes: number }

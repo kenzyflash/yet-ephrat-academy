@@ -84,13 +84,14 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
           .select('discussion_id')
           .eq('user_id', user.id);
 
-        const { data: downvotes } = await supabase
+        // Use any type to bypass TypeScript issues until types are regenerated
+        const { data: downvotes } = await (supabase as any)
           .from('discussion_downvotes')
           .select('discussion_id')
           .eq('user_id', user.id);
 
         upvotedIds = upvotes?.map(u => u.discussion_id) || [];
-        downvotedIds = downvotes?.map(d => d.discussion_id) || [];
+        downvotedIds = downvotes?.map((d: any) => d.discussion_id) || [];
       }
 
       // Organize discussions with replies
@@ -98,13 +99,14 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         const profile = profilesData?.find(p => p.id === discussion.user_id);
         return {
           ...discussion,
+          downvotes: (discussion as any).downvotes || 0,
+          parent_id: (discussion as any).parent_id || null,
           profiles: profile ? {
             first_name: profile.first_name,
             last_name: profile.last_name
           } : null,
           hasUpvoted: upvotedIds.includes(discussion.id),
-          hasDownvoted: downvotedIds.includes(discussion.id),
-          downvotes: discussion.downvotes || 0
+          hasDownvoted: downvotedIds.includes(discussion.id)
         };
       });
 
@@ -247,7 +249,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         if (updateError) throw updateError;
       } else {
         // Remove downvote if exists
-        await supabase
+        await (supabase as any)
           .from('discussion_downvotes')
           .delete()
           .eq('discussion_id', discussionId)
@@ -288,7 +290,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
     try {
       if (hasDownvoted) {
         // Remove downvote
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('discussion_downvotes')
           .delete()
           .eq('discussion_id', discussionId)
@@ -297,7 +299,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         if (error) throw error;
 
         // Update downvote count
-        const { error: updateError } = await supabase.rpc('decrement_downvotes', {
+        const { error: updateError } = await (supabase as any).rpc('decrement_downvotes', {
           discussion_id: discussionId
         });
 
@@ -311,7 +313,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
           .eq('user_id', user.id);
 
         // Add downvote
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('discussion_downvotes')
           .insert({
             discussion_id: discussionId,
@@ -321,7 +323,7 @@ const CourseDiscussion = ({ courseId }: CourseDiscussionProps) => {
         if (error) throw error;
 
         // Update downvote count
-        const { error: updateError } = await supabase.rpc('increment_downvotes', {
+        const { error: updateError } = await (supabase as any).rpc('increment_downvotes', {
           discussion_id: discussionId
         });
 
