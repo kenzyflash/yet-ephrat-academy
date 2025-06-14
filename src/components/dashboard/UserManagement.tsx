@@ -38,40 +38,57 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('Fetching users...');
       
-      // Fetch all profiles
+      // First, fetch all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
 
-      // Fetch all user roles
+      console.log('Profiles fetched:', profiles?.length);
+
+      // Then, fetch all user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
+        .select('user_id, role');
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error('Error fetching roles:', rolesError);
+        throw rolesError;
+      }
 
-      // Create role map for quick lookup
+      console.log('Roles fetched:', userRoles?.length);
+
+      // Create a map of user_id to role for quick lookup
       const roleMap = new Map<string, string>();
-      userRoles?.forEach(role => {
-        roleMap.set(role.user_id, role.role);
+      userRoles?.forEach(userRole => {
+        roleMap.set(userRole.user_id, userRole.role);
       });
 
-      // Combine profiles with roles
-      const usersWithRoles: User[] = profiles?.map(profile => ({
-        id: profile.id,
-        first_name: profile.first_name || 'Unknown',
-        last_name: profile.last_name || 'User',
-        email: profile.email || 'No email',
-        role: (roleMap.get(profile.id) as 'student' | 'teacher' | 'admin') || 'student',
-        created_at: profile.created_at,
-        school: profile.school || undefined,
-        grade: profile.grade || undefined
-      })) || [];
+      console.log('Role map:', Object.fromEntries(roleMap));
 
+      // Combine profiles with their roles
+      const usersWithRoles: User[] = profiles?.map(profile => {
+        const userRole = roleMap.get(profile.id) || 'student';
+        return {
+          id: profile.id,
+          first_name: profile.first_name || 'Unknown',
+          last_name: profile.last_name || 'User',
+          email: profile.email || 'No email',
+          role: userRole as 'student' | 'teacher' | 'admin',
+          created_at: profile.created_at,
+          school: profile.school || undefined,
+          grade: profile.grade || undefined
+        };
+      }) || [];
+
+      console.log('Final users with roles:', usersWithRoles);
       setUsers(usersWithRoles);
       
       toast({
@@ -80,7 +97,7 @@ const UserManagement = () => {
       });
       
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error in fetchUsers:', error);
       toast({
         title: "Error",
         description: "Failed to load users. Please try again.",
@@ -93,18 +110,31 @@ const UserManagement = () => {
 
   const updateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
-      // Delete existing role
-      await supabase
+      console.log(`Updating role for user ${userId} to ${newRole}`);
+      
+      // First, check if user already has a role
+      const { data: existingRole } = await supabase
         .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
+        .select('*')
+        .eq('user_id', userId)
+        .single();
 
-      // Insert new role
-      const { error } = await supabase
-        .from('user_roles')
-        .insert({ user_id: userId, role: newRole });
+      if (existingRole) {
+        // Update existing role
+        const { error: updateError } = await supabase
+          .from('user_roles')
+          .update({ role: newRole })
+          .eq('user_id', userId);
 
-      if (error) throw error;
+        if (updateError) throw updateError;
+      } else {
+        // Insert new role
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: newRole });
+
+        if (insertError) throw insertError;
+      }
 
       // Update local state
       setUsers(users.map(user => 
@@ -115,6 +145,7 @@ const UserManagement = () => {
         title: "Role Updated",
         description: `User role has been updated to ${newRole}.`,
       });
+      
     } catch (error) {
       console.error('Error updating role:', error);
       toast({
@@ -285,6 +316,9 @@ const UserManagement = () => {
                 <SelectItem value="admin">Admins</SelectItem>
               </SelectContent>
             </Select>
+            <Button onClick={fetchUsers} variant="outline">
+              Refresh
+            </Button>
           </div>
 
           {/* Users Table */}
