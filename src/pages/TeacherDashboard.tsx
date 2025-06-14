@@ -15,7 +15,7 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import EnhancedCourseManagement from "@/components/dashboard/EnhancedCourseManagement";
 import SubmissionManagement from "@/components/dashboard/SubmissionManagement";
 import { useCourseData } from "@/hooks/useCourseData";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RecentActivity {
@@ -28,6 +28,8 @@ const TeacherDashboard = () => {
   const { user, userRole } = useAuth();
   const { courses, loading } = useCourseData();
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const dataFetchedRef = useRef(false);
 
   // Filter courses to show only those created by the current user
   const userCourses = courses.filter(course => course.instructor_id === user?.id);
@@ -45,9 +47,18 @@ const TeacherDashboard = () => {
     { label: "Total Lessons", value: userCourses.reduce((sum, course) => sum + (course.total_lessons || 0), 0).toString(), icon: TrendingUp, color: "text-orange-600" }
   ];
 
+  // Fetch recent activities only once when component mounts and user/courses are available
   useEffect(() => {
-    fetchRecentActivities();
-  }, [user, userCourses]);
+    if (user && userCourses.length > 0 && !dataFetchedRef.current) {
+      fetchRecentActivities();
+      dataFetchedRef.current = true;
+    }
+  }, [user, userCourses.length]);
+
+  // Reset data fetched flag when user changes
+  useEffect(() => {
+    dataFetchedRef.current = false;
+  }, [user?.id]);
 
   const fetchRecentActivities = async () => {
     if (!user || userCourses.length === 0) {
@@ -55,6 +66,7 @@ const TeacherDashboard = () => {
       return;
     }
 
+    setActivitiesLoading(true);
     try {
       const courseIds = userCourses.map(course => course.id);
       const { data: discussions, error } = await supabase
@@ -79,10 +91,15 @@ const TeacherDashboard = () => {
     } catch (error) {
       console.error('Error fetching recent activities:', error);
       setRecentActivities([]);
+    } finally {
+      setActivitiesLoading(false);
     }
   };
 
-  if (loading) {
+  // Only show loading for initial load, not for tab switching
+  const isInitialLoading = loading && !dataFetchedRef.current;
+
+  if (isInitialLoading) {
     return (
       <ProtectedRoute requiredRole="teacher">
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
@@ -124,7 +141,11 @@ const TeacherDashboard = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {recentActivities.length > 0 ? (
+                  {activitiesLoading ? (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">Loading activities...</p>
+                    </div>
+                  ) : recentActivities.length > 0 ? (
                     recentActivities.map((activity, index) => (
                       <div key={index} className="p-3 border rounded-lg">
                         <p className="font-medium text-gray-800 text-sm mb-1">{activity.action}</p>
