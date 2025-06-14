@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,135 +49,8 @@ const CourseManagement = ({ onCourseSelect }: CourseManagementProps) => {
   // Filter courses to show only those created by the current user
   const userCourses = courses.filter(course => course.instructor_id === user?.id);
 
-  const handleCreateCourse = async () => {
-    if (!newCourse.title || !newCourse.description || !user) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .insert({
-          title: newCourse.title,
-          description: newCourse.description,
-          instructor_name: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Teacher',
-          instructor_id: user.id,
-          duration: newCourse.duration,
-          level: newCourse.level,
-          category: newCourse.category,
-          price: newCourse.price,
-          image_url: newCourse.image_url,
-          student_count: 0,
-          rating: 0,
-          total_lessons: 0
-        });
-
-      if (error) throw error;
-
-      await refetchCourses();
-      setNewCourse({
-        title: '',
-        description: '',
-        duration: '',
-        level: 'Beginner',
-        category: 'Mathematics',
-        price: 'Free',
-        image_url: ''
-      });
-      setIsCreateDialogOpen(false);
-      
-      toast({
-        title: "Course created",
-        description: "Your new course has been created successfully.",
-      });
-    } catch (error: any) {
-      console.error('Error creating course:', error);
-      toast({
-        title: "Error",
-        description: `Failed to create course: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleEditCourse = async () => {
-    if (!editingCourse || !user) return;
-
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .update({
-          title: editingCourse.title,
-          description: editingCourse.description,
-          duration: editingCourse.duration,
-          level: editingCourse.level,
-          category: editingCourse.category,
-          price: editingCourse.price,
-          image_url: editingCourse.image_url
-        })
-        .eq('id', editingCourse.id);
-
-      if (error) throw error;
-
-      await refetchCourses();
-      setEditingCourse(null);
-      setIsEditDialogOpen(false);
-      
-      toast({
-        title: "Course updated",
-        description: "Course details have been updated successfully.",
-      });
-    } catch (error: any) {
-      console.error('Error updating course:', error);
-      toast({
-        title: "Error",
-        description: `Failed to update course: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-
-      if (error) throw error;
-
-      await refetchCourses();
-      toast({
-        title: "Course deleted",
-        description: "The course has been removed.",
-      });
-    } catch (error: any) {
-      console.error('Error deleting course:', error);
-      toast({
-        title: "Error",
-        description: `Failed to delete course: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleCourseSelect = (courseId: string) => {
-    setSelectedCourseId(courseId);
-    if (onCourseSelect) {
-      onCourseSelect(courseId);
-    }
-  };
-
-  if (loading) {
+  // Only show loading on initial load when we have no courses data yet
+  if (loading && courses.length === 0) {
     return (
       <Card className="bg-white/80 backdrop-blur-sm">
         <CardContent className="p-6">
@@ -485,6 +357,134 @@ const CourseManagement = ({ onCourseSelect }: CourseManagementProps) => {
       </CardContent>
     </Card>
   );
+
+  const handleCreateCourse = async () => {
+    if (!newCourse.title || !newCourse.description || !user) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .insert({
+          title: newCourse.title,
+          description: newCourse.description,
+          instructor_name: `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 'Teacher',
+          instructor_id: user.id,
+          duration: newCourse.duration,
+          level: newCourse.level,
+          category: newCourse.category,
+          price: newCourse.price,
+          image_url: newCourse.image_url,
+          student_count: 0,
+          rating: 0,
+          total_lessons: 0
+        });
+
+      if (error) throw error;
+
+      await refetchCourses();
+      setNewCourse({
+        title: '',
+        description: '',
+        duration: '',
+        level: 'Beginner',
+        category: 'Mathematics',
+        price: 'Free',
+        image_url: ''
+      });
+      setIsCreateDialogOpen(false);
+      
+      toast({
+        title: "Course created",
+        description: "Your new course has been created successfully.",
+      });
+    } catch (error: any) {
+      console.error('Error creating course:', error);
+      toast({
+        title: "Error",
+        description: `Failed to create course: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditCourse = async () => {
+    if (!editingCourse || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          title: editingCourse.title,
+          description: editingCourse.description,
+          duration: editingCourse.duration,
+          level: editingCourse.level,
+          category: editingCourse.category,
+          price: editingCourse.price,
+          image_url: editingCourse.image_url
+        })
+        .eq('id', editingCourse.id);
+
+      if (error) throw error;
+
+      await refetchCourses();
+      setEditingCourse(null);
+      setIsEditDialogOpen(false);
+      
+      toast({
+        title: "Course updated",
+        description: "Course details have been updated successfully.",
+      });
+    } catch (error: any) {
+      console.error('Error updating course:', error);
+      toast({
+        title: "Error",
+        description: `Failed to update course: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      await refetchCourses();
+      toast({
+        title: "Course deleted",
+        description: "The course has been removed.",
+      });
+    } catch (error: any) {
+      console.error('Error deleting course:', error);
+      toast({
+        title: "Error",
+        description: `Failed to delete course: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCourseSelect = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    if (onCourseSelect) {
+      onCourseSelect(courseId);
+    }
+  };
 };
 
 export default CourseManagement;
