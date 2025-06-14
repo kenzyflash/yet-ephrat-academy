@@ -8,6 +8,8 @@ import { Award, Download, Eye, Calendar, User, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCourseData } from '@/hooks/useCourseData';
 import { useToast } from '@/hooks/use-toast';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const CertificateGenerator = () => {
   const { user } = useAuth();
@@ -15,6 +17,7 @@ const CertificateGenerator = () => {
   const { toast } = useToast();
   const [selectedCourse, setSelectedCourse] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const certificateRef = useRef<HTMLDivElement>(null);
 
   // Get completed courses (progress = 100%)
@@ -31,13 +34,74 @@ const CertificateGenerator = () => {
   const downloadCertificate = async () => {
     if (!selectedCourse || !certificateRef.current) return;
 
+    setIsDownloading(true);
+    
+    try {
+      toast({
+        title: "Generating Certificate",
+        description: "Please wait while we prepare your certificate for download..."
+      });
+
+      // Create canvas from the certificate element
+      const canvas = await html2canvas(certificateRef.current, {
+        scale: 2, // Higher quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: certificateRef.current.offsetWidth,
+        height: certificateRef.current.offsetHeight
+      });
+
+      // Create PDF in landscape orientation
+      const pdf = new jsPDF('landscape', 'mm', 'a4');
+      
+      // Calculate dimensions to fit the certificate properly
+      const imgWidth = 297; // A4 landscape width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Add the image to PDF
+      pdf.addImage(
+        canvas.toDataURL('image/png'),
+        'PNG',
+        0,
+        0,
+        imgWidth,
+        imgHeight
+      );
+
+      // Generate filename
+      const filename = `Certificate-${selectedCourse.title.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().getFullYear()}.pdf`;
+
+      // Save the PDF
+      pdf.save(filename);
+
+      toast({
+        title: "Certificate Downloaded",
+        description: `Your certificate for ${selectedCourse.title} has been downloaded successfully!`
+      });
+
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      toast({
+        title: "Download Error",
+        description: "There was an error generating your certificate. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const printCertificate = async () => {
+    if (!selectedCourse || !certificateRef.current) return;
+
     try {
       // Create a new window for printing
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         toast({
           title: "Error",
-          description: "Please allow pop-ups to download the certificate.",
+          description: "Please allow pop-ups to print the certificate.",
           variant: "destructive"
         });
         return;
@@ -144,22 +208,18 @@ const CertificateGenerator = () => {
       printWindow.document.close();
 
       toast({
-        title: "Certificate Download Started",
-        description: `Certificate for ${selectedCourse.title} is being prepared for download. Use your browser's print dialog to save as PDF.`
+        title: "Certificate Print Started",
+        description: `Certificate for ${selectedCourse.title} is being prepared for printing.`
       });
 
     } catch (error) {
-      console.error('Error downloading certificate:', error);
+      console.error('Error printing certificate:', error);
       toast({
-        title: "Download Error",
-        description: "There was an error preparing your certificate for download.",
+        title: "Print Error",
+        description: "There was an error preparing your certificate for printing.",
         variant: "destructive"
       });
     }
-  };
-
-  const printCertificate = () => {
-    downloadCertificate();
   };
 
   const CertificatePreview = ({ course }: { course: any }) => {
@@ -301,9 +361,13 @@ const CertificateGenerator = () => {
                               <Button variant="outline" onClick={printCertificate}>
                                 Print Certificate
                               </Button>
-                              <Button onClick={downloadCertificate} className="bg-emerald-600 hover:bg-emerald-700">
+                              <Button 
+                                onClick={downloadCertificate} 
+                                disabled={isDownloading}
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                              >
                                 <Download className="mr-1 h-4 w-4" />
-                                Download PDF
+                                {isDownloading ? 'Generating...' : 'Download PDF'}
                               </Button>
                             </div>
                           </DialogContent>
@@ -312,13 +376,14 @@ const CertificateGenerator = () => {
                         <Button 
                           size="sm" 
                           className="bg-emerald-600 hover:bg-emerald-700"
+                          disabled={isDownloading}
                           onClick={() => {
                             setSelectedCourse(course);
                             downloadCertificate();
                           }}
                         >
                           <Download className="mr-1 h-4 w-4" />
-                          Download
+                          {isDownloading ? 'Generating...' : 'Download'}
                         </Button>
                       </div>
                     </div>
