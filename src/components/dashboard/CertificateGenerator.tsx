@@ -30,9 +30,10 @@ const CertificateGenerator = () => {
   const generateCertificate = (course: any) => {
     setSelectedCourse(course);
     setIsPreviewOpen(true);
+    setIsQuickDownload(false);
   };
 
-  const resetDialogState = () => {
+  const closeDialog = () => {
     setIsPreviewOpen(false);
     setIsQuickDownload(false);
     setSelectedCourse(null);
@@ -157,10 +158,14 @@ const CertificateGenerator = () => {
         variant: "destructive"
       });
     } finally {
-      // Always reset all states after download attempt (success or failure)
+      // Reset states but keep the course selected momentarily to prevent errors
+      setIsDownloading(false);
+      setDownloadProgress('');
+      
+      // Close dialog after a short delay to ensure download completes
       setTimeout(() => {
-        resetDialogState();
-      }, 500); // Small delay to ensure PDF download starts before resetting
+        closeDialog();
+      }, 1000);
     }
   };
 
@@ -310,9 +315,9 @@ const CertificateGenerator = () => {
                       <div className="flex gap-2">
                         <Dialog open={isPreviewOpen && selectedCourse?.id === course.id && !isQuickDownload} onOpenChange={(open) => {
                           if (!open) {
-                            resetDialogState();
+                            closeDialog();
                           } else {
-                            setIsPreviewOpen(open);
+                            generateCertificate(course);
                           }
                         }}>
                           <DialogTrigger asChild>
