@@ -37,12 +37,13 @@ const SubmissionManagement = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<AssignmentSubmission | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    if (user && !hasInitiallyLoaded) {
       fetchSubmissions();
     }
-  }, [user]);
+  }, [user, hasInitiallyLoaded]);
 
   const fetchSubmissions = async (showRefreshing = false) => {
     if (!user) return;
@@ -80,6 +81,7 @@ const SubmissionManagement = () => {
       if (!teacherAssignments || teacherAssignments.length === 0) {
         console.log('No assignments found for this teacher');
         setSubmissions([]);
+        setHasInitiallyLoaded(true);
         if (showRefreshing) {
           toast({
             title: "Refreshed",
@@ -109,6 +111,7 @@ const SubmissionManagement = () => {
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
         setSubmissions([]);
+        setHasInitiallyLoaded(true);
         if (showRefreshing) {
           toast({
             title: "Refreshed",
@@ -173,6 +176,7 @@ const SubmissionManagement = () => {
 
       console.log('Final enriched submissions:', enrichedSubmissions);
       setSubmissions(enrichedSubmissions);
+      setHasInitiallyLoaded(true);
 
       if (showRefreshing) {
         toast({
@@ -189,6 +193,7 @@ const SubmissionManagement = () => {
         variant: "destructive"
       });
       setSubmissions([]);
+      setHasInitiallyLoaded(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -196,6 +201,7 @@ const SubmissionManagement = () => {
   };
 
   const handleRefresh = () => {
+    setHasInitiallyLoaded(false);
     fetchSubmissions(true);
   };
 
@@ -238,7 +244,7 @@ const SubmissionManagement = () => {
     return new Date(submittedAt) > new Date(dueDate);
   };
 
-  if (loading) {
+  if (loading && !hasInitiallyLoaded) {
     return (
       <Card className="bg-white/80 backdrop-blur-sm">
         <CardContent className="p-6">

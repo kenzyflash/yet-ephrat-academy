@@ -26,9 +26,10 @@ interface RecentActivity {
 
 const TeacherDashboard = () => {
   const { user, userRole } = useAuth();
-  const { courses, loading } = useCourseData();
+  const { courses, loading: coursesLoading } = useCourseData();
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [dashboardInitialized, setDashboardInitialized] = useState(false);
   const dataFetchedRef = useRef(false);
 
   // Filter courses to show only those created by the current user
@@ -47,17 +48,23 @@ const TeacherDashboard = () => {
     { label: "Total Lessons", value: userCourses.reduce((sum, course) => sum + (course.total_lessons || 0), 0).toString(), icon: TrendingUp, color: "text-orange-600" }
   ];
 
-  // Fetch recent activities only once when component mounts and user/courses are available
+  // Initialize dashboard once when component mounts and user is available
   useEffect(() => {
-    if (user && userCourses.length > 0 && !dataFetchedRef.current) {
-      fetchRecentActivities();
-      dataFetchedRef.current = true;
+    if (user && !dashboardInitialized) {
+      setDashboardInitialized(true);
+      if (userCourses.length > 0 && !dataFetchedRef.current) {
+        fetchRecentActivities();
+        dataFetchedRef.current = true;
+      }
     }
-  }, [user, userCourses.length]);
+  }, [user, userCourses.length, dashboardInitialized]);
 
-  // Reset data fetched flag when user changes
+  // Reset initialization flag when user changes
   useEffect(() => {
-    dataFetchedRef.current = false;
+    if (user?.id) {
+      dataFetchedRef.current = false;
+      setDashboardInitialized(false);
+    }
   }, [user?.id]);
 
   const fetchRecentActivities = async () => {
@@ -96,16 +103,14 @@ const TeacherDashboard = () => {
     }
   };
 
-  // Only show loading for initial load, not for tab switching
-  const isInitialLoading = loading && !dataFetchedRef.current;
-
-  if (isInitialLoading) {
+  // Only show loading for initial course load
+  if (coursesLoading && !dashboardInitialized) {
     return (
       <ProtectedRoute requiredRole="teacher">
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
           <DashboardHeader title="SafHub - Teacher" />
           <div className="container mx-auto px-4 py-8">
-            <div className="text-center">Loading...</div>
+            <div className="text-center">Loading dashboard...</div>
           </div>
         </div>
       </ProtectedRoute>
