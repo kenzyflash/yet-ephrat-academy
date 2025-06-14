@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Award, Download, Eye, Calendar, User, BookOpen } from 'lucide-react';
+import { Award, Download, Eye, Calendar, User, BookOpen, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCourseData } from '@/hooks/useCourseData';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ const CertificateGenerator = () => {
   const [selectedCourse, setSelectedCourse] = useState<any>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState('');
   const certificateRef = useRef<HTMLDivElement>(null);
 
   // Get completed courses (progress = 100%)
@@ -32,194 +33,125 @@ const CertificateGenerator = () => {
   };
 
   const downloadCertificate = async () => {
-    if (!selectedCourse || !certificateRef.current) return;
+    if (!selectedCourse || !certificateRef.current) {
+      toast({
+        title: "Error",
+        description: "Certificate not ready. Please try again.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsDownloading(true);
+    setDownloadProgress('Preparing certificate...');
     
     try {
       toast({
-        title: "Generating Certificate",
-        description: "Please wait while we prepare your certificate for download..."
+        title: "Starting Download",
+        description: "Generating your certificate PDF...",
       });
+
+      setDownloadProgress('Capturing certificate image...');
+      console.log('Starting certificate generation for:', selectedCourse.title);
+      
+      // Wait a moment for the dialog to fully render
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Create canvas from the certificate element
       const canvas = await html2canvas(certificateRef.current, {
-        scale: 2, // Higher quality
+        scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
+        logging: false,
         width: certificateRef.current.offsetWidth,
-        height: certificateRef.current.offsetHeight
+        height: certificateRef.current.offsetHeight,
+        onclone: (clonedDoc) => {
+          // Ensure all styles are applied to the cloned document
+          const clonedElement = clonedDoc.querySelector('[data-certificate]');
+          if (clonedElement) {
+            clonedElement.style.transform = 'none';
+            clonedElement.style.position = 'relative';
+          }
+        }
       });
 
-      // Create PDF in landscape orientation
-      const pdf = new jsPDF('landscape', 'mm', 'a4');
+      setDownloadProgress('Creating PDF document...');
+      console.log('Canvas created, dimensions:', canvas.width, 'x', canvas.height);
+
+      // Create PDF in landscape orientation (A4)
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // A4 landscape dimensions in mm
+      const pdfWidth = 297;
+      const pdfHeight = 210;
       
       // Calculate dimensions to fit the certificate properly
-      const imgWidth = 297; // A4 landscape width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgAspectRatio = canvas.width / canvas.height;
+      const pdfAspectRatio = pdfWidth / pdfHeight;
+      
+      let imgWidth, imgHeight, offsetX, offsetY;
+      
+      if (imgAspectRatio > pdfAspectRatio) {
+        // Image is wider than PDF
+        imgWidth = pdfWidth;
+        imgHeight = pdfWidth / imgAspectRatio;
+        offsetX = 0;
+        offsetY = (pdfHeight - imgHeight) / 2;
+      } else {
+        // Image is taller than PDF
+        imgHeight = pdfHeight;
+        imgWidth = pdfHeight * imgAspectRatio;
+        offsetX = (pdfWidth - imgWidth) / 2;
+        offsetY = 0;
+      }
+
+      setDownloadProgress('Finalizing PDF...');
       
       // Add the image to PDF
-      pdf.addImage(
-        canvas.toDataURL('image/png'),
-        'PNG',
-        0,
-        0,
-        imgWidth,
-        imgHeight
-      );
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
 
-      // Generate filename
-      const filename = `Certificate-${selectedCourse.title.replace(/[^a-zA-Z0-9]/g, '_')}-${new Date().getFullYear()}.pdf`;
+      // Generate filename with safe characters
+      const safeTitle = selectedCourse.title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+      const filename = `Certificate_${safeTitle}_${new Date().getFullYear()}.pdf`;
+
+      setDownloadProgress('Downloading...');
+      console.log('Saving PDF as:', filename);
 
       // Save the PDF
       pdf.save(filename);
 
+      // Show success message
       toast({
-        title: "Certificate Downloaded",
-        description: `Your certificate for ${selectedCourse.title} has been downloaded successfully!`
+        title: "Certificate Downloaded!",
+        description: `Your certificate for "${selectedCourse.title}" has been saved as ${filename}`,
       });
+
+      console.log('Certificate download completed successfully');
 
     } catch (error) {
       console.error('Error generating certificate:', error);
       toast({
-        title: "Download Error",
+        title: "Download Failed",
         description: "There was an error generating your certificate. Please try again.",
         variant: "destructive"
       });
     } finally {
       setIsDownloading(false);
+      setDownloadProgress('');
     }
   };
 
-  const printCertificate = async () => {
-    if (!selectedCourse || !certificateRef.current) return;
-
-    try {
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: "Error",
-          description: "Please allow pop-ups to print the certificate.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Get the certificate HTML content
-      const certificateContent = certificateRef.current.outerHTML;
-      
-      // Create the print document
-      const printDocument = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Certificate - ${selectedCourse.title}</title>
-            <meta charset="utf-8">
-            <style>
-              @media print {
-                @page {
-                  size: A4 landscape;
-                  margin: 0;
-                }
-                body {
-                  margin: 0;
-                  padding: 20px;
-                  font-family: system-ui, -apple-system, sans-serif;
-                }
-              }
-              body {
-                margin: 0;
-                padding: 20px;
-                font-family: system-ui, -apple-system, sans-serif;
-                background: white;
-              }
-              .bg-white { background-color: white; }
-              .p-8 { padding: 2rem; }
-              .border-8 { border-width: 8px; }
-              .border-yellow-400 { border-color: #facc15; }
-              .rounded-lg { border-radius: 0.5rem; }
-              .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
-              .max-w-4xl { max-width: 56rem; }
-              .mx-auto { margin-left: auto; margin-right: auto; }
-              .text-center { text-align: center; }
-              .space-y-6 > * + * { margin-top: 1.5rem; }
-              .space-y-4 > * + * { margin-top: 1rem; }
-              .border-b-4 { border-bottom-width: 4px; }
-              .pb-4 { padding-bottom: 1rem; }
-              .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
-              .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
-              .text-2xl { font-size: 1.5rem; line-height: 2rem; }
-              .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-              .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
-              .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
-              .font-bold { font-weight: 700; }
-              .font-semibold { font-weight: 600; }
-              .text-gray-800 { color: #1f2937; }
-              .text-gray-700 { color: #374151; }
-              .text-gray-600 { color: #4b5563; }
-              .text-gray-400 { color: #9ca3af; }
-              .text-emerald-600 { color: #059669; }
-              .text-yellow-500 { color: #eab308; }
-              .mb-2 { margin-bottom: 0.5rem; }
-              .mb-4 { margin-bottom: 1rem; }
-              .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
-              .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-              .px-8 { padding-left: 2rem; padding-right: 2rem; }
-              .p-4 { padding: 1rem; }
-              .pt-8 { padding-top: 2rem; }
-              .pt-2 { padding-top: 0.5rem; }
-              .border-b-2 { border-bottom-width: 2px; }
-              .border-t-2 { border-top-width: 2px; }
-              .border-2 { border-width: 2px; }
-              .border-gray-300 { border-color: #d1d5db; }
-              .border-gray-200 { border-color: #e5e7eb; }
-              .border-gray-400 { border-color: #9ca3af; }
-              .border-yellow-200 { border-color: #fef3c7; }
-              .inline-block { display: inline-block; }
-              .bg-yellow-50 { background-color: #fefce8; }
-              .rounded-lg { border-radius: 0.5rem; }
-              .flex { display: flex; }
-              .justify-between { justify-content: space-between; }
-              .items-end { align-items: flex-end; }
-              .w-48 { width: 12rem; }
-              .h-16 { height: 4rem; }
-              .w-16 { width: 4rem; }
-              .mb-2 { margin-bottom: 0.5rem; }
-            </style>
-          </head>
-          <body>
-            ${certificateContent}
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() {
-                  window.close();
-                }, 1000);
-              }
-            </script>
-          </body>
-        </html>
-      `;
-
-      // Write the document and trigger print
-      printWindow.document.write(printDocument);
-      printWindow.document.close();
-
-      toast({
-        title: "Certificate Print Started",
-        description: `Certificate for ${selectedCourse.title} is being prepared for printing.`
-      });
-
-    } catch (error) {
-      console.error('Error printing certificate:', error);
-      toast({
-        title: "Print Error",
-        description: "There was an error preparing your certificate for printing.",
-        variant: "destructive"
-      });
-    }
+  const quickDownload = async (course: any) => {
+    setSelectedCourse(course);
+    // Wait for selectedCourse state to update
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await downloadCertificate();
   };
 
   const CertificatePreview = ({ course }: { course: any }) => {
@@ -232,8 +164,9 @@ const CertificateGenerator = () => {
     return (
       <div 
         ref={certificateRef}
+        data-certificate="true"
         className="bg-white p-8 border-8 border-yellow-400 rounded-lg shadow-2xl max-w-4xl mx-auto"
-        style={{ aspectRatio: '4/3' }}
+        style={{ aspectRatio: '4/3', minWidth: '800px' }}
       >
         <div className="text-center space-y-6">
           <div className="border-b-4 border-yellow-400 pb-4">
@@ -294,10 +227,20 @@ const CertificateGenerator = () => {
           Certificate Generator
         </CardTitle>
         <CardDescription>
-          Generate certificates for completed courses
+          Generate and download certificates for completed courses
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {isDownloading && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 text-blue-700">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="font-medium">Generating Certificate</span>
+            </div>
+            <p className="text-sm text-blue-600 mt-1">{downloadProgress}</p>
+          </div>
+        )}
+
         {completedCourses.length === 0 ? (
           <div className="text-center py-8">
             <Award className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -306,9 +249,17 @@ const CertificateGenerator = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 mb-4">
-              You have {completedCourses.length} certificate(s) available for download.
-            </p>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 text-green-700">
+                <Award className="h-4 w-4" />
+                <span className="font-medium">
+                  {completedCourses.length} certificate(s) ready for download
+                </span>
+              </div>
+              <p className="text-sm text-green-600 mt-1">
+                Click "Download PDF" to save your certificates to your device
+              </p>
+            </div>
             
             {completedCourses.map((course) => {
               const enrollment = enrollments.find(e => e.course_id === course.id);
@@ -342,6 +293,7 @@ const CertificateGenerator = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => generateCertificate(course)}
+                              disabled={isDownloading}
                             >
                               <Eye className="mr-1 h-4 w-4" />
                               Preview
@@ -358,16 +310,22 @@ const CertificateGenerator = () => {
                             {selectedCourse && <CertificatePreview course={selectedCourse} />}
                             
                             <div className="flex justify-end gap-2 mt-4">
-                              <Button variant="outline" onClick={printCertificate}>
-                                Print Certificate
-                              </Button>
                               <Button 
                                 onClick={downloadCertificate} 
                                 disabled={isDownloading}
                                 className="bg-emerald-600 hover:bg-emerald-700"
                               >
-                                <Download className="mr-1 h-4 w-4" />
-                                {isDownloading ? 'Generating...' : 'Download PDF'}
+                                {isDownloading ? (
+                                  <>
+                                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                                    Generating PDF...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-1 h-4 w-4" />
+                                    Download PDF
+                                  </>
+                                )}
                               </Button>
                             </div>
                           </DialogContent>
@@ -377,13 +335,19 @@ const CertificateGenerator = () => {
                           size="sm" 
                           className="bg-emerald-600 hover:bg-emerald-700"
                           disabled={isDownloading}
-                          onClick={() => {
-                            setSelectedCourse(course);
-                            downloadCertificate();
-                          }}
+                          onClick={() => quickDownload(course)}
                         >
-                          <Download className="mr-1 h-4 w-4" />
-                          {isDownloading ? 'Generating...' : 'Download'}
+                          {isDownloading && selectedCourse?.id === course.id ? (
+                            <>
+                              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="mr-1 h-4 w-4" />
+                              Download PDF
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
