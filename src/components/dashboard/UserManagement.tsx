@@ -37,20 +37,12 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching all users...');
+      console.log('Starting to fetch all users...');
       
-      // Fetch all profiles from the database
-      const { data: profiles, error: profilesError } = await supabase
+      // First, let's get ALL profiles without any filters
+      const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          created_at,
-          school,
-          grade
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (profilesError) {
@@ -58,38 +50,60 @@ const UserManagement = () => {
         throw profilesError;
       }
 
-      console.log('Fetched profiles:', profiles?.length || 0);
+      console.log('Raw profiles fetched:', allProfiles?.length || 0, allProfiles);
 
-      // Fetch all user roles
-      const { data: userRoles, error: rolesError } = await supabase
+      if (!allProfiles || allProfiles.length === 0) {
+        console.warn('No profiles found in database');
+        setUsers([]);
+        return;
+      }
+
+      // Get ALL user roles without any filters
+      const { data: allUserRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role');
+        .select('*');
 
       if (rolesError) {
         console.error('Error fetching user roles:', rolesError);
-        // Don't throw here, continue with empty roles
+        // Continue with empty roles rather than failing completely
       }
 
-      console.log('Fetched user roles:', userRoles?.length || 0);
+      console.log('Raw user roles fetched:', allUserRoles?.length || 0, allUserRoles);
 
-      // Create a map of user roles for faster lookup
-      const roleMap = new Map();
-      userRoles?.forEach(role => {
-        roleMap.set(role.user_id, role.role);
+      // Create a map of user roles for efficient lookup
+      const roleMap = new Map<string, string>();
+      if (allUserRoles) {
+        allUserRoles.forEach(roleEntry => {
+          roleMap.set(roleEntry.user_id, roleEntry.role);
+        });
+      }
+
+      console.log('Role map created:', Array.from(roleMap.entries()));
+
+      // Combine profiles with roles, ensuring every user has a role
+      const usersWithRoles: User[] = allProfiles.map(profile => {
+        const userRole = roleMap.get(profile.id) || 'student';
+        console.log(`User ${profile.email} has role: ${userRole}`);
+        
+        return {
+          id: profile.id,
+          first_name: profile.first_name || '',
+          last_name: profile.last_name || '',
+          email: profile.email || '',
+          role: userRole as 'student' | 'teacher' | 'admin',
+          created_at: profile.created_at,
+          school: profile.school || undefined,
+          grade: profile.grade || undefined
+        };
       });
 
-      // Combine profiles with roles, ensuring every user has a role (default to 'student')
-      const usersWithRoles = profiles?.map(profile => ({
-        ...profile,
-        role: roleMap.get(profile.id) || 'student'
-      })) || [];
+      console.log('Final users with roles:', usersWithRoles.length, usersWithRoles);
 
-      console.log('Users with roles:', usersWithRoles.length);
-
-      // For users without roles in user_roles table, create the role entry
+      // For users without roles in user_roles table, create the default role entry
       const usersNeedingRoles = usersWithRoles.filter(user => !roleMap.has(user.id));
+      
       if (usersNeedingRoles.length > 0) {
-        console.log('Creating default roles for', usersNeedingRoles.length, 'users');
+        console.log('Creating default student roles for users:', usersNeedingRoles.map(u => u.email));
         
         const roleInserts = usersNeedingRoles.map(user => ({
           user_id: user.id,
@@ -103,17 +117,18 @@ const UserManagement = () => {
         if (insertError) {
           console.warn('Could not insert default roles:', insertError);
         } else {
-          console.log('Successfully created default roles');
+          console.log('Successfully created default student roles');
         }
       }
 
       setUsers(usersWithRoles);
-      console.log('Final user count:', usersWithRoles.length);
+      console.log('Users state updated with', usersWithRoles.length, 'users');
+      
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Critical error in fetchUsers:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch users. Please try again.",
+        description: "Failed to fetch users. Please check the console for details.",
         variant: "destructive"
       });
     } finally {
@@ -306,12 +321,15 @@ const UserManagement = () => {
               size="sm"
               onClick={fetchUsers}
               className="ml-auto"
+              disabled={loading}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </CardTitle>
-          <CardDescription>Manage user accounts and permissions ({filteredUsers.length} of {users.length} users)</CardDescription>
+          <CardDescription>
+            Manage user accounts and permissions ({filteredUsers.length} of {users.length} users)
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {/* Filters */}
@@ -340,13 +358,27 @@ const UserManagement = () => {
             </Select>
           </div>
 
+          {/* Debug Info */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+            <p><strong>Debug Info:</strong></p>
+            <p>Total users in state: {users.length}</p>
+            <p>Filtered users: {filteredUsers.length}</p>
+            <p>Current filter: {roleFilter}</p>
+            <p>Search term: "{searchTerm}"</p>
+          </div>
+
           {/* Users List */}
           <div className="space-y-4">
             {filteredUsers.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p className="text-sm font-medium mb-1">No users found</p>
-                <p className="text-xs">Try adjusting your search or filter criteria</p>
+                <p className="text-xs">
+                  {users.length === 0 
+                    ? "No users in database" 
+                    : "Try adjusting your search or filter criteria"
+                  }
+                </p>
               </div>
             ) : (
               filteredUsers.map((user) => (
