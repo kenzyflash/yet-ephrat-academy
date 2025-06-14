@@ -1,6 +1,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,7 +17,10 @@ const VideoPlayer = ({ videoUrl, title, duration, onWatchTimeUpdate, onComplete 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
   const [watchedTime, setWatchedTime] = useState(0);
+  const [hasCompletedOnce, setHasCompletedOnce] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
@@ -27,16 +31,17 @@ const VideoPlayer = ({ videoUrl, title, duration, onWatchTimeUpdate, onComplete 
         setWatchedTime(newWatchedTime);
         onWatchTimeUpdate(Math.floor(newWatchedTime / 60));
         
-        // Check if 80% of the video has been watched
+        // Check if 80% of the video has been watched and hasn't been completed before
         const completionThreshold = (duration * 60) * 0.8;
-        if (newWatchedTime >= completionThreshold) {
+        if (newWatchedTime >= completionThreshold && !hasCompletedOnce) {
+          setHasCompletedOnce(true);
           onComplete();
         }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, watchedTime, duration, onWatchTimeUpdate, onComplete]);
+  }, [isPlaying, watchedTime, duration, onWatchTimeUpdate, onComplete, hasCompletedOnce]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -62,6 +67,35 @@ const VideoPlayer = ({ videoUrl, title, duration, onWatchTimeUpdate, onComplete 
     }
   };
 
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setVideoDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleSeek = (value: number[]) => {
+    if (videoRef.current && videoDuration > 0) {
+      const newTime = (value[0] / 100) * videoDuration;
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
+  };
+
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0] / 100;
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+      if (newVolume === 0) {
+        setIsMuted(true);
+        videoRef.current.muted = true;
+      } else if (isMuted) {
+        setIsMuted(false);
+        videoRef.current.muted = false;
+      }
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -71,6 +105,8 @@ const VideoPlayer = ({ videoUrl, title, duration, onWatchTimeUpdate, onComplete 
   // Demo video for now - in production this would use the actual videoUrl
   const demoVideoUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
 
+  const progressPercentage = videoDuration > 0 ? (currentTime / videoDuration) * 100 : 0;
+
   return (
     <div className="relative bg-gray-900 rounded-lg overflow-hidden">
       <video
@@ -78,11 +114,25 @@ const VideoPlayer = ({ videoUrl, title, duration, onWatchTimeUpdate, onComplete 
         src={videoUrl || demoVideoUrl}
         className="w-full aspect-video"
         onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
         onEnded={() => setIsPlaying(false)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
       />
       
       {/* Video Controls Overlay */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+        {/* Progress Bar */}
+        <div className="mb-4">
+          <Slider
+            value={[progressPercentage]}
+            onValueChange={handleSeek}
+            max={100}
+            step={0.1}
+            className="w-full"
+          />
+        </div>
+        
         <div className="flex items-center justify-between text-white">
           <div className="flex items-center gap-4">
             <Button
@@ -94,31 +144,35 @@ const VideoPlayer = ({ videoUrl, title, duration, onWatchTimeUpdate, onComplete 
               {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleMute}
-              className="text-white hover:bg-white/20"
-            >
-              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleMute}
+                className="text-white hover:bg-white/20"
+              >
+                {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+              </Button>
+              
+              <div className="w-20">
+                <Slider
+                  value={[isMuted ? 0 : volume * 100]}
+                  onValueChange={handleVolumeChange}
+                  max={100}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+            </div>
             
             <span className="text-sm">
-              {formatTime(currentTime)} / {formatTime(duration * 60)}
+              {formatTime(currentTime)} / {formatTime(videoDuration || duration * 60)}
             </span>
           </div>
           
           <div className="text-sm">
             Watch time: {Math.floor(watchedTime / 60)} min
           </div>
-        </div>
-        
-        {/* Progress Bar */}
-        <div className="mt-2 w-full bg-white/30 rounded-full h-1">
-          <div 
-            className="bg-emerald-500 h-1 rounded-full transition-all duration-300"
-            style={{ width: `${(currentTime / (duration * 60)) * 100}%` }}
-          />
         </div>
       </div>
       

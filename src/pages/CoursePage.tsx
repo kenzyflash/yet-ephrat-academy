@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,6 +154,12 @@ const CoursePage = () => {
   const markLessonComplete = async (lessonId: string) => {
     if (!user || !courseId) return;
 
+    // Check if lesson is already completed to prevent duplicate notifications
+    const alreadyCompleted = isLessonCompleted(lessonId);
+    if (alreadyCompleted) {
+      return;
+    }
+
     try {
       // Use upsert to avoid duplicate key violations
       const { error } = await supabase
@@ -186,6 +193,11 @@ const CoursePage = () => {
         title: "Lesson completed!",
         description: "Great job! Keep up the good work.",
       });
+
+      // Auto-advance to next lesson if available
+      if (selectedLesson < lessons.length - 1) {
+        setSelectedLesson(selectedLesson + 1);
+      }
     } catch (error) {
       console.error('Error marking lesson complete:', error);
       toast({
@@ -331,6 +343,26 @@ const CoursePage = () => {
                             <CheckCircle className="mr-2 h-4 w-4" />
                             {isLessonCompleted(currentLesson.id) ? 'Completed' : 'Mark as Complete'}
                           </Button>
+                          
+                          {/* Navigation buttons */}
+                          <div className="flex gap-2">
+                            {selectedLesson > 0 && (
+                              <Button 
+                                variant="outline"
+                                onClick={() => setSelectedLesson(selectedLesson - 1)}
+                              >
+                                Previous Lesson
+                              </Button>
+                            )}
+                            {selectedLesson < lessons.length - 1 && (
+                              <Button 
+                                variant="outline"
+                                onClick={() => setSelectedLesson(selectedLesson + 1)}
+                              >
+                                Next Lesson
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>
