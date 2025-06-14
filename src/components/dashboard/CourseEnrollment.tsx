@@ -36,10 +36,17 @@ const CourseEnrollment = () => {
         title: "Enrollment successful!",
         description: "You have been enrolled in the course. Start learning now!",
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Enrollment error:', error);
+      
+      let errorMessage = "Failed to enroll in course. Please try again.";
+      if (error.message && error.message.includes('already enrolled')) {
+        errorMessage = "You are already enrolled in this course.";
+      }
+      
       toast({
         title: "Enrollment failed",
-        description: "Failed to enroll in course. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }

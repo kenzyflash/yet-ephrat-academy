@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -143,6 +144,15 @@ export const useCourseData = () => {
     if (!user) return;
 
     try {
+      // Check if user is already enrolled
+      const existingEnrollment = enrollments.find(
+        enrollment => enrollment.course_id === courseId
+      );
+
+      if (existingEnrollment) {
+        throw new Error('You are already enrolled in this course');
+      }
+
       const { error } = await supabase
         .from('course_enrollments')
         .insert({
@@ -151,7 +161,14 @@ export const useCourseData = () => {
           progress: 0
         });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a duplicate key error
+        if (error.code === '23505') {
+          throw new Error('You are already enrolled in this course');
+        }
+        throw error;
+      }
+      
       await fetchEnrollments();
     } catch (error) {
       console.error('Error enrolling in course:', error);
