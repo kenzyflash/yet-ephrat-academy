@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, UserCheck, Search, Edit, RefreshCw } from 'lucide-react';
+import { Users, UserCheck, Search, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -28,144 +29,82 @@ const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchAllUsers();
+    fetchUsers();
   }, []);
 
-  const fetchAllUsers = async () => {
+  const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching all users...');
       
-      // First, get all profiles
+      // Fetch all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
-      
-      if (profilesError) {
-        console.error('❌ Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-      
-      console.log('👥 Profiles found:', profiles?.length || 0);
-      console.log('📋 Profiles data:', profiles);
-      
-      if (!profiles || profiles.length === 0) {
-        console.warn('⚠️ No profiles found in database');
-        setUsers([]);
-        toast({
-          title: "No Users Found",
-          description: "No user profiles were found in the database.",
-          variant: "destructive"
-        });
-        return;
-      }
 
-      // Get all user roles
+      if (profilesError) throw profilesError;
+
+      // Fetch all user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
-      
-      if (rolesError) {
-        console.error('❌ Error fetching user roles:', rolesError);
-        // Continue with default roles if role fetch fails
-      }
-      
-      console.log('🔑 User roles found:', userRoles?.length || 0);
-      console.log('📋 User roles data:', userRoles);
 
-      // Create a map of user roles for quick lookup
-      const roleMap = new Map();
-      if (userRoles) {
-        userRoles.forEach(role => {
-          roleMap.set(role.user_id, role.role);
-        });
-      }
+      if (rolesError) throw rolesError;
 
-      // Process all profiles and assign roles
-      const processedUsers: User[] = profiles.map(profile => {
-        const userRole = roleMap.get(profile.id) || 'student';
-        
-        console.log(`👤 Processing user: ${profile.email}`);
-        console.log(`   - ID: ${profile.id}`);
-        console.log(`   - Name: ${profile.first_name} ${profile.last_name}`);
-        console.log(`   - Role: ${userRole}`);
-        
-        return {
-          id: profile.id,
-          first_name: profile.first_name || 'Unknown',
-          last_name: profile.last_name || 'User',
-          email: profile.email || 'No email',
-          role: userRole as 'student' | 'teacher' | 'admin',
-          created_at: profile.created_at,
-          school: profile.school || undefined,
-          grade: profile.grade || undefined
-        };
+      // Create role map for quick lookup
+      const roleMap = new Map<string, string>();
+      userRoles?.forEach(role => {
+        roleMap.set(role.user_id, role.role);
       });
 
-      console.log('✅ Final processed users:', processedUsers);
-      console.log(`📊 Total users processed: ${processedUsers.length}`);
+      // Combine profiles with roles
+      const usersWithRoles: User[] = profiles?.map(profile => ({
+        id: profile.id,
+        first_name: profile.first_name || 'Unknown',
+        last_name: profile.last_name || 'User',
+        email: profile.email || 'No email',
+        role: (roleMap.get(profile.id) as 'student' | 'teacher' | 'admin') || 'student',
+        created_at: profile.created_at,
+        school: profile.school || undefined,
+        grade: profile.grade || undefined
+      })) || [];
 
-      setUsers(processedUsers);
+      setUsers(usersWithRoles);
       
       toast({
-        title: "Users Loaded Successfully",
-        description: `Successfully loaded ${processedUsers.length} users.`,
+        title: "Users Loaded",
+        description: `Successfully loaded ${usersWithRoles.length} users.`,
       });
       
     } catch (error) {
-      console.error('💥 Critical error in fetchAllUsers:', error);
+      console.error('Error fetching users:', error);
       toast({
-        title: "Error Loading Users",
-        description: `Failed to load users: ${error.message}`,
+        title: "Error",
+        description: "Failed to load users. Please try again.",
         variant: "destructive"
       });
-      setUsers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
+  const updateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
-      setUpdatingRole(userId);
-      console.log(`🔄 Updating user ${userId} role to ${newRole}`);
-      
       // Delete existing role
-      const { error: deleteError } = await supabase
+      await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', userId);
 
-      if (deleteError) {
-        console.error('❌ Error deleting existing role:', deleteError);
-      }
-
       // Insert new role
-      const { error: insertError } = await supabase
+      const { error } = await supabase
         .from('user_roles')
-        .insert({ 
-          user_id: userId, 
-          role: newRole 
-        });
+        .insert({ user_id: userId, role: newRole });
 
-      if (insertError) {
-        console.error('❌ Error inserting new role:', insertError);
-        throw insertError;
-      }
+      if (error) throw error;
 
       // Update local state
       setUsers(users.map(user => 
@@ -173,22 +112,20 @@ const UserManagement = () => {
       ));
       
       toast({
-        title: "Success",
+        title: "Role Updated",
         description: `User role has been updated to ${newRole}.`,
       });
     } catch (error) {
-      console.error('💥 Error updating user role:', error);
+      console.error('Error updating role:', error);
       toast({
         title: "Error",
         description: "Failed to update user role. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setUpdatingRole(null);
     }
   };
 
-  const handleEditUser = async () => {
+  const updateUserProfile = async () => {
     if (!editingUser) return;
 
     try {
@@ -208,22 +145,32 @@ const UserManagement = () => {
       setUsers(users.map(user => 
         user.id === editingUser.id ? editingUser : user
       ));
+      
       setEditingUser(null);
       setIsEditDialogOpen(false);
       
       toast({
-        title: "Success",
-        description: "User details have been updated successfully.",
+        title: "Profile Updated",
+        description: "User profile has been updated successfully.",
       });
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: "Failed to update user details. Please try again.",
+        description: "Failed to update user profile. Please try again.",
         variant: "destructive"
       });
     }
   };
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = 
+      user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    return matchesSearch && matchesRole;
+  });
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -240,7 +187,6 @@ const UserManagement = () => {
       acc[user.role] = (acc[user.role] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
-
     return { total, byRole };
   };
 
@@ -252,7 +198,7 @@ const UserManagement = () => {
         <CardContent className="p-6">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-            <p>Loading users from database...</p>
+            <p>Loading users...</p>
           </div>
         </CardContent>
       </Card>
@@ -309,17 +255,6 @@ const UserManagement = () => {
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-600" />
             User Management
-            <div className="ml-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchAllUsers}
-                disabled={loading}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Users
-              </Button>
-            </div>
           </CardTitle>
           <CardDescription>
             Manage all user accounts and permissions - Showing {filteredUsers.length} of {users.length} users
@@ -396,8 +331,7 @@ const UserManagement = () => {
                       <div className="flex gap-2">
                         <Select
                           value={user.role}
-                          onValueChange={(value) => handleUpdateUserRole(user.id, value as any)}
-                          disabled={updatingRole === user.id}
+                          onValueChange={(value) => updateUserRole(user.id, value as any)}
                         >
                           <SelectTrigger className="w-32">
                             <SelectValue />
@@ -463,7 +397,7 @@ const UserManagement = () => {
                                   />
                                 </div>
                                 <div className="flex gap-2">
-                                  <Button onClick={handleEditUser} className="bg-emerald-600 hover:bg-emerald-700">
+                                  <Button onClick={updateUserProfile} className="bg-emerald-600 hover:bg-emerald-700">
                                     Update User
                                   </Button>
                                   <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
