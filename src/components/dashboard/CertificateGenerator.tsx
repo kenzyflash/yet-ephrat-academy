@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,13 @@ const CertificateGenerator = () => {
   const generateCertificate = (course: any) => {
     setSelectedCourse(course);
     setIsPreviewOpen(true);
+  };
+
+  const resetDialogState = () => {
+    setIsPreviewOpen(false);
+    setIsQuickDownload(false);
+    setSelectedCourse(null);
+    setDownloadProgress('');
   };
 
   const downloadCertificate = async () => {
@@ -142,12 +148,6 @@ const CertificateGenerator = () => {
 
       console.log('Certificate download completed successfully');
 
-      // If it was a quick download, close the hidden dialog
-      if (isQuickDownload) {
-        setIsPreviewOpen(false);
-        setIsQuickDownload(false);
-      }
-
     } catch (error) {
       console.error('Error generating certificate:', error);
       toast({
@@ -158,6 +158,10 @@ const CertificateGenerator = () => {
     } finally {
       setIsDownloading(false);
       setDownloadProgress('');
+      // Reset dialog state after download completes
+      if (isQuickDownload) {
+        resetDialogState();
+      }
     }
   };
 
