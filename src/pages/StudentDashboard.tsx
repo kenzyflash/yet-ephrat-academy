@@ -1,4 +1,3 @@
-
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +32,7 @@ import CourseEnrollment from "@/components/dashboard/CourseEnrollment";
 import CertificateGenerator from "@/components/dashboard/CertificateGenerator";
 import { useCourseData } from "@/hooks/useCourseData";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
+import { useCourseProgress } from "@/hooks/useCourseProgress";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -72,6 +72,7 @@ const StudentDashboard = () => {
     refetchProgress,
     logStudySession
   } = useStudentProgress();
+  const { courseProgress, getCourseProgress } = useCourseProgress();
 
   useEffect(() => {
     if (user) {
@@ -263,8 +264,8 @@ const StudentDashboard = () => {
 
   // Calculate completed courses
   const completedCourses = enrolledCourses.filter(course => {
-    const enrollment = enrollments.find(e => e.course_id === course.id);
-    return enrollment && enrollment.progress >= 100;
+    const progress = getCourseProgress(course.id);
+    return progress && progress.progressPercentage >= 100;
   });
 
   const stats = [
@@ -351,8 +352,8 @@ const StudentDashboard = () => {
                         </p>
                       ) : (
                         enrolledCourses.map((course) => {
-                          const enrollment = enrollments.find(e => e.course_id === course.id);
-                          const progress = enrollment?.progress || 0;
+                          const progress = getCourseProgress(course.id);
+                          const progressPercentage = progress?.progressPercentage || 0;
                           
                           return (
                             <div key={course.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -370,11 +371,11 @@ const StudentDashboard = () => {
                                     <div className="flex-1">
                                       <div className="flex justify-between text-sm text-gray-600 mb-1">
                                         <span>Progress</span>
-                                        <span>{course.total_lessons} lessons</span>
+                                        <span>{progress?.completedLessons || 0}/{progress?.totalLessons || course.total_lessons || 0} lessons</span>
                                       </div>
-                                      <Progress value={progress} className="h-2" />
+                                      <Progress value={progressPercentage} className="h-2" />
                                     </div>
-                                    <Badge variant="secondary">{Math.round(progress)}%</Badge>
+                                    <Badge variant="secondary">{Math.round(progressPercentage)}%</Badge>
                                   </div>
                                   
                                   <div className="flex items-center justify-between">
