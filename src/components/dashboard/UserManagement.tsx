@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, UserCheck, Search, Edit, RefreshCw } from 'lucide-react';
+import { Users, UserCheck, Search, Edit, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,6 +30,7 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -39,24 +40,39 @@ const UserManagement = () => {
   const fetchAllUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Starting comprehensive user data fetch...');
+      console.log('🔍 Starting comprehensive user fetch with multiple strategies...');
       
-      // Step 1: Fetch ALL profiles from the database
-      const { data: profilesData, error: profilesError } = await supabase
+      // Strategy 1: Direct count from profiles
+      const { count: profileCount, error: countError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      console.log('📊 Total profiles count:', profileCount);
+      if (countError) console.error('Count error:', countError);
+
+      // Strategy 2: Fetch with no filters and limit
+      const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
-        .order('created_at', { ascending: false });
-
+        .limit(1000); // Set a high limit to ensure we get all
+      
+      console.log('👥 Raw profiles data:', allProfiles);
+      console.log('📈 Profiles fetched:', allProfiles?.length || 0);
+      
       if (profilesError) {
-        console.error('❌ Error fetching profiles:', profilesError);
+        console.error('❌ Profiles fetch error:', profilesError);
         throw profilesError;
       }
 
-      console.log(`📊 Total profiles found: ${profilesData?.length || 0}`, profilesData);
-
-      if (!profilesData || profilesData.length === 0) {
+      if (!allProfiles || allProfiles.length === 0) {
         console.warn('⚠️ No profiles found in database');
         setUsers([]);
+        setDebugInfo({ 
+          profileCount: 0, 
+          rolesCount: 0, 
+          error: 'No profiles found',
+          strategy: 'direct_fetch'
+        });
         toast({
           title: "No Users Found",
           description: "No user profiles were found in the database.",
@@ -65,70 +81,130 @@ const UserManagement = () => {
         return;
       }
 
-      // Step 2: Fetch ALL user roles from the database
-      const { data: rolesData, error: rolesError } = await supabase
+      // Strategy 3: Fetch all roles separately
+      const { data: allRoles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
-
+        .select('*')
+        .limit(1000);
+      
+      console.log('🎭 Raw roles data:', allRoles);
+      console.log('📊 Roles fetched:', allRoles?.length || 0);
+      
       if (rolesError) {
-        console.error('❌ Error fetching user roles:', rolesError);
-        // Don't throw here, just log the error and continue with default roles
+        console.error('❌ Roles fetch error:', rolesError);
       }
 
-      console.log(`🎭 Total roles found: ${rolesData?.length || 0}`, rolesData);
-
-      // Step 3: Create a comprehensive role mapping
-      const roleMapping = new Map<string, string>();
-      
-      if (rolesData && rolesData.length > 0) {
-        rolesData.forEach(roleEntry => {
-          roleMapping.set(roleEntry.user_id, roleEntry.role);
-          console.log(`🔗 Mapped role: ${roleEntry.user_id} -> ${roleEntry.role}`);
+      // Create role mapping
+      const roleMap = new Map<string, string>();
+      if (allRoles && allRoles.length > 0) {
+        allRoles.forEach(roleEntry => {
+          roleMap.set(roleEntry.user_id, roleEntry.role);
+          console.log(`🔗 Role mapping: ${roleEntry.user_id} -> ${roleEntry.role}`);
         });
       }
 
-      // Step 4: Process each profile and assign roles
-      const processedUsers: User[] = profilesData.map(profile => {
-        const assignedRole = roleMapping.get(profile.id) || 'student';
+      // Process all users
+      const processedUsers: User[] = allProfiles.map(profile => {
+        const userRole = roleMap.get(profile.id) || 'student';
         
-        console.log(`👤 Processing user: ${profile.email} (ID: ${profile.id})`);
+        console.log(`👤 Processing: ${profile.email}`);
+        console.log(`   - ID: ${profile.id}`);
         console.log(`   - Name: ${profile.first_name} ${profile.last_name}`);
-        console.log(`   - Role: ${assignedRole}`);
-        console.log(`   - School: ${profile.school || 'N/A'}`);
-        console.log(`   - Grade: ${profile.grade || 'N/A'}`);
+        console.log(`   - Role: ${userRole}`);
+        console.log(`   - School: ${profile.school || 'None'}`);
+        console.log(`   - Grade: ${profile.grade || 'None'}`);
         
         return {
           id: profile.id,
-          first_name: profile.first_name || '',
-          last_name: profile.last_name || '',
-          email: profile.email || '',
-          role: assignedRole as 'student' | 'teacher' | 'admin',
+          first_name: profile.first_name || 'Unknown',
+          last_name: profile.last_name || 'User',
+          email: profile.email || 'No email',
+          role: userRole as 'student' | 'teacher' | 'admin',
           created_at: profile.created_at,
           school: profile.school || undefined,
           grade: profile.grade || undefined
         };
       });
 
-      console.log(`✅ Successfully processed ${processedUsers.length} users:`, processedUsers);
+      console.log('✅ Final processed users:', processedUsers);
+      console.log(`📊 Total users processed: ${processedUsers.length}`);
 
-      // Step 5: Update state with all users
+      // Update state
       setUsers(processedUsers);
+      setDebugInfo({
+        profileCount: allProfiles.length,
+        rolesCount: allRoles?.length || 0,
+        processedCount: processedUsers.length,
+        strategy: 'comprehensive_fetch',
+        timestamp: new Date().toISOString()
+      });
       
       toast({
-        title: "Users Loaded",
+        title: "Users Loaded Successfully",
         description: `Successfully loaded ${processedUsers.length} users from the database.`,
       });
       
     } catch (error) {
       console.error('💥 Critical error in fetchAllUsers:', error);
+      setDebugInfo({
+        error: error.message,
+        strategy: 'failed_fetch',
+        timestamp: new Date().toISOString()
+      });
       toast({
         title: "Error Loading Users",
-        description: "Failed to load users from the database. Check console for details.",
+        description: `Failed to load users: ${error.message}`,
         variant: "destructive"
       });
       setUsers([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Alternative fetch method using different approach
+  const alternativeFetch = async () => {
+    try {
+      console.log('🔄 Trying alternative fetch method...');
+      
+      // Use RPC or function call if available
+      const { data: userData, error } = await supabase
+        .rpc('get_all_users_with_roles')
+        .single();
+      
+      if (error) {
+        console.log('RPC not available, using JOIN approach...');
+        
+        // Try with LEFT JOIN
+        const { data: joinedData, error: joinError } = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            user_roles (
+              role
+            )
+          `);
+        
+        if (joinError) throw joinError;
+        
+        console.log('🔗 Joined data:', joinedData);
+        
+        const processedUsers = joinedData?.map(profile => ({
+          id: profile.id,
+          first_name: profile.first_name || 'Unknown',
+          last_name: profile.last_name || 'User',
+          email: profile.email || 'No email',
+          role: (profile.user_roles?.[0]?.role || 'student') as 'student' | 'teacher' | 'admin',
+          created_at: profile.created_at,
+          school: profile.school,
+          grade: profile.grade
+        })) || [];
+        
+        setUsers(processedUsers);
+        console.log('✅ Alternative fetch successful:', processedUsers);
+      }
+    } catch (error) {
+      console.error('❌ Alternative fetch failed:', error);
     }
   };
 
@@ -311,16 +387,26 @@ const UserManagement = () => {
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-600" />
             User Management
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchAllUsers}
-              className="ml-auto"
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh All Users
-            </Button>
+            <div className="ml-auto flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={alternativeFetch}
+                className="text-orange-600"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Try Alternative Method
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchAllUsers}
+                disabled={loading}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh All Users
+              </Button>
+            </div>
           </CardTitle>
           <CardDescription>
             Manage all user accounts and permissions - Showing {filteredUsers.length} of {users.length} users
@@ -353,10 +439,26 @@ const UserManagement = () => {
             </Select>
           </div>
 
-          {/* Database Status */}
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
-            <p><strong>Database Status:</strong> Successfully loaded {users.length} users from profiles table</p>
-            <p><strong>Filter Status:</strong> Displaying {filteredUsers.length} users (Search: "{searchTerm}", Role: "{roleFilter}")</p>
+          {/* Enhanced Debug Status */}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <h4 className="font-semibold mb-2">Database Status:</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p><strong>Profiles Found:</strong> {debugInfo.profileCount || 0}</p>
+                <p><strong>Roles Found:</strong> {debugInfo.rolesCount || 0}</p>
+                <p><strong>Processed Users:</strong> {debugInfo.processedCount || 0}</p>
+              </div>
+              <div>
+                <p><strong>Current Display:</strong> {filteredUsers.length} users</p>
+                <p><strong>Search Term:</strong> "{searchTerm || 'none'}"</p>
+                <p><strong>Role Filter:</strong> {roleFilter}</p>
+                <p><strong>Strategy:</strong> {debugInfo.strategy || 'unknown'}</p>
+              </div>
+            </div>
+            {debugInfo.error && (
+              <p className="text-red-600 mt-2"><strong>Error:</strong> {debugInfo.error}</p>
+            )}
+            <p className="text-xs text-gray-500 mt-2">Last updated: {debugInfo.timestamp}</p>
           </div>
 
           {/* Users Table */}
@@ -366,7 +468,7 @@ const UserManagement = () => {
               <p className="text-sm font-medium mb-1">No users found</p>
               <p className="text-xs">
                 {users.length === 0 
-                  ? "No users found in database. Please check your database connection." 
+                  ? "No users found in database. Try the 'Alternative Method' button above." 
                   : "Try adjusting your search or filter criteria."
                 }
               </p>
