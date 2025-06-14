@@ -48,10 +48,20 @@ export const useCourseData = () => {
 
   useEffect(() => {
     if (user) {
-      fetchCourses();
-      fetchEnrollments();
+      fetchData();
     }
   }, [user]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchCourses(), fetchEnrollments()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchCourses = async () => {
     try {
@@ -126,17 +136,10 @@ export const useCourseData = () => {
 
       if (error) throw error;
 
-      // Filter enrollments to only include courses that still exist
-      const courseIds = courses.map(c => c.id);
-      const validEnrollments = (data || []).filter(enrollment => 
-        courseIds.includes(enrollment.course_id)
-      );
-
-      setEnrollments(validEnrollments);
+      setEnrollments(data || []);
     } catch (error) {
       console.error('Error fetching enrollments:', error);
-    } finally {
-      setLoading(false);
+      setEnrollments([]);
     }
   };
 
@@ -144,12 +147,17 @@ export const useCourseData = () => {
     if (!user) return;
 
     try {
-      // Check if user is already enrolled
-      const existingEnrollment = enrollments.find(
-        enrollment => enrollment.course_id === courseId
-      );
+      // Check if user is already enrolled using fresh data
+      const { data: existingData, error: checkError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .maybeSingle();
 
-      if (existingEnrollment) {
+      if (checkError) throw checkError;
+
+      if (existingData) {
         throw new Error('You are already enrolled in this course');
       }
 
@@ -169,6 +177,7 @@ export const useCourseData = () => {
         throw error;
       }
       
+      // Refresh enrollments to ensure UI is updated
       await fetchEnrollments();
     } catch (error) {
       console.error('Error enrolling in course:', error);
@@ -182,6 +191,7 @@ export const useCourseData = () => {
     loading,
     enrollInCourse,
     refetchCourses: fetchCourses,
-    refetchEnrollments: fetchEnrollments
+    refetchEnrollments: fetchEnrollments,
+    refetchData: fetchData
   };
 };

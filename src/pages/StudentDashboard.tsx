@@ -74,14 +74,26 @@ const StudentDashboard = () => {
   } = useStudentProgress();
   const { courseProgress, getCourseProgress } = useCourseProgress();
 
+  // Debug logging to see what data we have
+  useEffect(() => {
+    console.log('Courses:', courses);
+    console.log('Enrollments:', enrollments);
+    console.log('Enrolled courses count:', getEnrolledCourses().length);
+  }, [courses, enrollments]);
+
   useEffect(() => {
     if (user) {
       fetchUserProfile();
-      fetchAssignments();
       // Log a study session when user visits dashboard
       logStudySession(15); // 15 minutes for visiting dashboard
     }
   }, [user]);
+
+  useEffect(() => {
+    if (enrollments.length > 0) {
+      fetchAssignments();
+    }
+  }, [enrollments]);
 
   useEffect(() => {
     if (currentGoals) {
@@ -117,16 +129,11 @@ const StudentDashboard = () => {
   };
 
   const fetchAssignments = async () => {
-    if (!user) return;
+    if (!user || enrollments.length === 0) return;
 
     try {
       // Get enrolled course IDs
       const enrolledCourseIds = enrollments.map(e => e.course_id);
-      
-      if (enrolledCourseIds.length === 0) {
-        setAssignments([]);
-        return;
-      }
 
       // Get assignments for enrolled courses
       const { data: assignmentData, error } = await supabase
@@ -167,9 +174,11 @@ const StudentDashboard = () => {
   };
 
   const getEnrolledCourses = () => {
-    return courses.filter(course => 
+    const enrolled = courses.filter(course => 
       enrollments.some(enrollment => enrollment.course_id === course.id)
     );
+    console.log('Filtered enrolled courses:', enrolled);
+    return enrolled;
   };
 
   const handleContinueCourse = (courseId: string) => {
@@ -341,15 +350,30 @@ const StudentDashboard = () => {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <BookOpen className="h-5 w-5 text-emerald-600" />
-                        My Courses
+                        My Courses ({enrolledCourses.length})
                       </CardTitle>
                       <CardDescription>Continue your learning journey</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {enrolledCourses.length === 0 ? (
-                        <p className="text-gray-500 text-center py-8">
-                          You haven't enrolled in any courses yet. Browse available courses to get started!
-                        </p>
+                        <div className="text-center py-8">
+                          <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                          <p className="text-gray-500 mb-4">
+                            You haven't enrolled in any courses yet.
+                          </p>
+                          <p className="text-sm text-gray-400 mb-4">
+                            Debug: {enrollments.length} enrollments found, {courses.length} courses total
+                          </p>
+                          <Button 
+                            onClick={() => {
+                              const tabsTrigger = document.querySelector('[value="courses"]') as HTMLElement;
+                              if (tabsTrigger) tabsTrigger.click();
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            Browse Available Courses
+                          </Button>
+                        </div>
                       ) : (
                         enrolledCourses.map((course) => {
                           const progress = getCourseProgress(course.id);
