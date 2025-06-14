@@ -93,7 +93,7 @@ const UserManagement = () => {
         
         const roleInserts = usersNeedingRoles.map(user => ({
           user_id: user.id,
-          role: 'student'
+          role: 'student' as const
         }));
 
         const { error: insertError } = await supabase
