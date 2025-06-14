@@ -21,17 +21,6 @@ interface User {
   grade?: string;
 }
 
-interface ProfileWithRoles {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  created_at: string;
-  school?: string;
-  grade?: string;
-  user_roles: Array<{ role: string }>;
-}
-
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,38 +39,33 @@ const UserManagement = () => {
   const fetchAllUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Starting comprehensive user fetch with multiple strategies...');
+      console.log('🔍 Fetching users with proper JOIN query...');
       
-      // Strategy 1: Direct count from profiles
-      const { count: profileCount, error: countError } = await supabase
+      // Now we can use JOIN since the foreign key relationship exists
+      const { data: joinedData, error: joinError } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true });
+        .select(`
+          *,
+          user_roles (
+            role
+          )
+        `);
       
-      console.log('📊 Total profiles count:', profileCount);
-      if (countError) console.error('Count error:', countError);
-
-      // Strategy 2: Fetch with no filters and limit
-      const { data: allProfiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .limit(1000); // Set a high limit to ensure we get all
-      
-      console.log('👥 Raw profiles data:', allProfiles);
-      console.log('📈 Profiles fetched:', allProfiles?.length || 0);
-      
-      if (profilesError) {
-        console.error('❌ Profiles fetch error:', profilesError);
-        throw profilesError;
+      if (joinError) {
+        console.error('❌ JOIN query failed:', joinError);
+        throw joinError;
       }
-
-      if (!allProfiles || allProfiles.length === 0) {
+      
+      console.log('🔗 Joined data:', joinedData);
+      
+      if (!joinedData || joinedData.length === 0) {
         console.warn('⚠️ No profiles found in database');
         setUsers([]);
         setDebugInfo({ 
           profileCount: 0, 
           rolesCount: 0, 
           error: 'No profiles found',
-          strategy: 'direct_fetch'
+          strategy: 'join_query'
         });
         toast({
           title: "No Users Found",
@@ -91,31 +75,9 @@ const UserManagement = () => {
         return;
       }
 
-      // Strategy 3: Fetch all roles separately
-      const { data: allRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .limit(1000);
-      
-      console.log('🎭 Raw roles data:', allRoles);
-      console.log('📊 Roles fetched:', allRoles?.length || 0);
-      
-      if (rolesError) {
-        console.error('❌ Roles fetch error:', rolesError);
-      }
-
-      // Create role mapping
-      const roleMap = new Map<string, string>();
-      if (allRoles && allRoles.length > 0) {
-        allRoles.forEach(roleEntry => {
-          roleMap.set(roleEntry.user_id, roleEntry.role);
-          console.log(`🔗 Role mapping: ${roleEntry.user_id} -> ${roleEntry.role}`);
-        });
-      }
-
-      // Process all users
-      const processedUsers: User[] = allProfiles.map(profile => {
-        const userRole = roleMap.get(profile.id) || 'student';
+      // Process the joined data
+      const processedUsers: User[] = joinedData.map(profile => {
+        const userRole = profile.user_roles?.[0]?.role || 'student';
         
         console.log(`👤 Processing: ${profile.email}`);
         console.log(`   - ID: ${profile.id}`);
@@ -142,23 +104,23 @@ const UserManagement = () => {
       // Update state
       setUsers(processedUsers);
       setDebugInfo({
-        profileCount: allProfiles.length,
-        rolesCount: allRoles?.length || 0,
+        profileCount: joinedData.length,
+        rolesCount: joinedData.filter(p => p.user_roles && p.user_roles.length > 0).length,
         processedCount: processedUsers.length,
-        strategy: 'comprehensive_fetch',
+        strategy: 'join_query_with_fk',
         timestamp: new Date().toISOString()
       });
       
       toast({
         title: "Users Loaded Successfully",
-        description: `Successfully loaded ${processedUsers.length} users from the database.`,
+        description: `Successfully loaded ${processedUsers.length} users using JOIN query.`,
       });
       
     } catch (error) {
       console.error('💥 Critical error in fetchAllUsers:', error);
       setDebugInfo({
         error: error.message,
-        strategy: 'failed_fetch',
+        strategy: 'failed_join_query',
         timestamp: new Date().toISOString()
       });
       toast({
@@ -172,7 +134,7 @@ const UserManagement = () => {
     }
   };
 
-  // Alternative fetch method using direct query approach
+  // Keep the alternative fetch as backup
   const alternativeFetch = async () => {
     try {
       console.log('🔄 Trying alternative fetch method with direct queries...');
@@ -224,7 +186,7 @@ const UserManagement = () => {
         profileCount: profilesData?.length || 0,
         rolesCount: rolesData?.length || 0,
         processedCount: processedUsers.length,
-        strategy: 'direct_queries',
+        strategy: 'direct_queries_backup',
         timestamp: new Date().toISOString()
       });
       
