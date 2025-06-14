@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +14,7 @@ import {
   ArrowLeft,
   Download,
   MessageSquare,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileDropdown from "@/components/ProfileDropdown";
@@ -208,6 +208,41 @@ const CoursePage = () => {
     }
   };
 
+  const removeLessonComplete = async (lessonId: string) => {
+    if (!user || !courseId) return;
+
+    try {
+      // Update the lesson progress to mark as incomplete
+      const { error } = await supabase
+        .from('lesson_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          course_id: courseId,
+          completed: false,
+          completed_at: null
+        }, {
+          onConflict: 'user_id,lesson_id'
+        });
+
+      if (error) throw error;
+
+      await fetchLessonProgress();
+
+      toast({
+        title: "Completion removed",
+        description: "Lesson marked as incomplete.",
+      });
+    } catch (error) {
+      console.error('Error removing lesson completion:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove lesson completion",
+        variant: "destructive"
+      });
+    }
+  };
+
   const isLessonCompleted = (lessonId: string) => {
     return lessonProgress.some(p => p.lesson_id === lessonId && p.completed);
   };
@@ -331,18 +366,33 @@ const CoursePage = () => {
                         <p className="text-gray-600 mb-4">{currentLesson.description}</p>
                         
                         <div className="flex items-center gap-4">
-                          <Button 
-                            onClick={() => markLessonComplete(currentLesson.id)}
-                            disabled={isLessonCompleted(currentLesson.id)}
-                            className={`${
-                              isLessonCompleted(currentLesson.id) 
-                                ? 'bg-green-600 hover:bg-green-700' 
-                                : 'bg-emerald-600 hover:bg-emerald-700'
-                            }`}
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            {isLessonCompleted(currentLesson.id) ? 'Completed' : 'Mark as Complete'}
-                          </Button>
+                          {isLessonCompleted(currentLesson.id) ? (
+                            <div className="flex gap-2">
+                              <Button 
+                                disabled
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Completed
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                onClick={() => removeLessonComplete(currentLesson.id)}
+                                className="border-red-200 text-red-600 hover:bg-red-50"
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Remove Completion
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              onClick={() => markLessonComplete(currentLesson.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700"
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Mark as Complete
+                            </Button>
+                          )}
                           
                           {/* Navigation buttons */}
                           <div className="flex gap-2">
