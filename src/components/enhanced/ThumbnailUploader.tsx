@@ -16,44 +16,6 @@ const ThumbnailUploader = ({ onUploadComplete, currentUrl }: ThumbnailUploaderPr
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
-  const ensureBucketExists = async () => {
-    try {
-      // First check if the bucket exists
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-      console.log('Available buckets:', buckets);
-      
-      if (bucketsError) {
-        console.error('Error listing buckets:', bucketsError);
-        throw bucketsError;
-      }
-
-      const bucketExists = buckets?.some(bucket => bucket.id === 'course-thumbnails');
-      
-      if (!bucketExists) {
-        console.log('Bucket does not exist, attempting to create...');
-        
-        // Try to create the bucket
-        const { data: createData, error: createError } = await supabase.storage.createBucket('course-thumbnails', {
-          public: true,
-          fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
-        });
-
-        if (createError) {
-          console.error('Error creating bucket:', createError);
-          throw new Error(`Failed to create storage bucket: ${createError.message}`);
-        }
-
-        console.log('Bucket created successfully:', createData);
-      } else {
-        console.log('Bucket exists, proceeding with upload');
-      }
-    } catch (error) {
-      console.error('Error ensuring bucket exists:', error);
-      throw error;
-    }
-  };
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -83,9 +45,6 @@ const ThumbnailUploader = ({ onUploadComplete, currentUrl }: ThumbnailUploaderPr
       if (!user) {
         throw new Error('User not authenticated. Please log in and try again.');
       }
-
-      // Ensure bucket exists before attempting upload
-      await ensureBucketExists();
 
       const fileExt = file.name.split('.').pop();
       const filePath = `${Date.now()}-${Math.random()}.${fileExt}`;
