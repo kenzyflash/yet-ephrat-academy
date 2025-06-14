@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, UserCheck, Search, Plus, Edit } from 'lucide-react';
+import { Users, UserCheck, Search, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -28,6 +28,7 @@ const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,7 +39,7 @@ const UserManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch profiles with their roles
+      // Fetch all profiles from the database
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
@@ -49,32 +50,55 @@ const UserManagement = () => {
           created_at,
           school,
           grade
-        `);
+        `)
+        .order('created_at', { ascending: false });
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
 
-      // Fetch user roles
+      // Fetch all user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role');
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        throw rolesError;
+      }
 
-      // Combine profiles with roles
-      const usersWithRoles = profiles?.map(profile => {
-        const userRole = userRoles?.find(role => role.user_id === profile.id);
-        return {
-          ...profile,
-          role: userRole?.role || 'student'
-        };
-      }) || [];
+      // Create a map of user roles for faster lookup
+      const roleMap = new Map();
+      userRoles?.forEach(role => {
+        roleMap.set(role.user_id, role.role);
+      });
+
+      // Combine profiles with roles, ensuring every user has a role (default to 'student')
+      const usersWithRoles = profiles?.map(profile => ({
+        ...profile,
+        role: roleMap.get(profile.id) || 'student'
+      })) || [];
+
+      // For users without roles in user_roles table, create the role entry
+      for (const user of usersWithRoles) {
+        if (!roleMap.has(user.id)) {
+          try {
+            await supabase
+              .from('user_roles')
+              .insert({ user_id: user.id, role: 'student' });
+          } catch (insertError) {
+            console.warn('Could not insert default role for user:', user.id, insertError);
+          }
+        }
+      }
 
       setUsers(usersWithRoles);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch users",
+        description: "Failed to fetch users. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -93,12 +117,33 @@ const UserManagement = () => {
 
   const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
-      // Update user role in database
+      setUpdatingRole(userId);
+      
+      // Update user role in database using upsert to handle both insert and update
       const { error } = await supabase
         .from('user_roles')
-        .upsert({ user_id: userId, role: newRole });
+        .upsert({ 
+          user_id: userId, 
+          role: newRole 
+        }, {
+          onConflict: 'user_id,role'
+        });
 
-      if (error) throw error;
+      if (error) {
+        // If upsert fails, try to delete existing role and insert new one
+        const { error: deleteError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId);
+
+        if (deleteError) throw deleteError;
+
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: newRole });
+
+        if (insertError) throw insertError;
+      }
 
       // Update local state
       setUsers(users.map(user => 
@@ -106,16 +151,18 @@ const UserManagement = () => {
       ));
       
       toast({
-        title: "User role updated",
-        description: `User role has been changed to ${newRole}.`,
+        title: "Success",
+        description: `User role has been updated to ${newRole}.`,
       });
     } catch (error) {
       console.error('Error updating user role:', error);
       toast({
         title: "Error",
-        description: "Failed to update user role",
+        description: "Failed to update user role. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setUpdatingRole(null);
     }
   };
 
@@ -143,14 +190,14 @@ const UserManagement = () => {
       setIsEditDialogOpen(false);
       
       toast({
-        title: "User updated",
+        title: "Success",
         description: "User details have been updated successfully.",
       });
     } catch (error) {
       console.error('Error updating user:', error);
       toast({
         title: "Error",
-        description: "Failed to update user",
+        description: "Failed to update user details. Please try again.",
         variant: "destructive"
       });
     }
@@ -181,7 +228,10 @@ const UserManagement = () => {
     return (
       <Card className="bg-white/80 backdrop-blur-sm">
         <CardContent className="p-6">
-          <div className="text-center">Loading users...</div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+            <p>Loading users...</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -238,7 +288,7 @@ const UserManagement = () => {
             <Users className="h-5 w-5 text-emerald-600" />
             User Management
           </CardTitle>
-          <CardDescription>Manage user accounts and permissions</CardDescription>
+          <CardDescription>Manage user accounts and permissions ({filteredUsers.length} users)</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Filters */}
@@ -269,109 +319,118 @@ const UserManagement = () => {
 
           {/* Users List */}
           <div className="space-y-4">
-            {filteredUsers.map((user) => (
-              <div key={user.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-800">
-                        {user.first_name} {user.last_name}
-                      </h3>
-                      <Badge className={getRoleBadgeColor(user.role)}>
-                        {user.role}
-                      </Badge>
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm font-medium mb-1">No users found</p>
+                <p className="text-xs">Try adjusting your search or filter criteria</p>
+              </div>
+            ) : (
+              filteredUsers.map((user) => (
+                <div key={user.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-gray-800">
+                          {user.first_name} {user.last_name}
+                        </h3>
+                        <Badge className={getRoleBadgeColor(user.role)}>
+                          {user.role}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1">{user.email}</p>
+                      <div className="flex gap-4 text-xs text-gray-500">
+                        <span>Joined: {new Date(user.created_at).toLocaleDateString()}</span>
+                        {user.school && <span>School: {user.school}</span>}
+                        {user.grade && <span>Grade: {user.grade}</span>}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">{user.email}</p>
-                    <div className="flex gap-4 text-xs text-gray-500">
-                      <span>Joined: {new Date(user.created_at).toLocaleDateString()}</span>
-                      {user.school && <span>School: {user.school}</span>}
-                      {user.grade && <span>Grade: {user.grade}</span>}
+                    <div className="flex gap-2">
+                      <Select
+                        value={user.role}
+                        onValueChange={(value) => handleUpdateUserRole(user.id, value as any)}
+                        disabled={updatingRole === user.id}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="student">Student</SelectItem>
+                          <SelectItem value="teacher">Teacher</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Dialog open={isEditDialogOpen && editingUser?.id === user.id} onOpenChange={setIsEditDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setEditingUser(user)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit User</DialogTitle>
+                            <DialogDescription>
+                              Update user information.
+                            </DialogDescription>
+                          </DialogHeader>
+                          {editingUser && (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="text-sm font-medium">First Name</label>
+                                <Input
+                                  value={editingUser.first_name}
+                                  onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Last Name</label>
+                                <Input
+                                  value={editingUser.last_name}
+                                  onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Email</label>
+                                <Input
+                                  value={editingUser.email}
+                                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">School</label>
+                                <Input
+                                  value={editingUser.school || ''}
+                                  onChange={(e) => setEditingUser({ ...editingUser, school: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-sm font-medium">Grade</label>
+                                <Input
+                                  value={editingUser.grade || ''}
+                                  onChange={(e) => setEditingUser({ ...editingUser, grade: e.target.value })}
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button onClick={handleEditUser} className="bg-emerald-600 hover:bg-emerald-700">
+                                  Update User
+                                </Button>
+                                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Select
-                      value={user.role}
-                      onValueChange={(value) => handleUpdateUserRole(user.id, value as any)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="teacher">Teacher</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Dialog open={isEditDialogOpen && editingUser?.id === user.id} onOpenChange={setIsEditDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setEditingUser(user)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit User</DialogTitle>
-                          <DialogDescription>
-                            Update user information.
-                          </DialogDescription>
-                        </DialogHeader>
-                        {editingUser && (
-                          <div className="space-y-4">
-                            <div>
-                              <label className="text-sm font-medium">First Name</label>
-                              <Input
-                                value={editingUser.first_name}
-                                onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Last Name</label>
-                              <Input
-                                value={editingUser.last_name}
-                                onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Email</label>
-                              <Input
-                                value={editingUser.email}
-                                onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">School</label>
-                              <Input
-                                value={editingUser.school || ''}
-                                onChange={(e) => setEditingUser({ ...editingUser, school: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Grade</label>
-                              <Input
-                                value={editingUser.grade || ''}
-                                onChange={(e) => setEditingUser({ ...editingUser, grade: e.target.value })}
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <Button onClick={handleEditUser} className="bg-emerald-600 hover:bg-emerald-700">
-                                Update User
-                              </Button>
-                              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
