@@ -102,35 +102,19 @@ export const useStudentProgress = () => {
     const today = new Date().toISOString().split('T')[0];
 
     try {
-      // Check if there's already a session for today
-      const { data: existingSession } = await supabase
-        .from('study_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single();
+      // Use the increment_study_minutes function to handle duplicates safely
+      const { error } = await supabase.rpc('increment_study_minutes', {
+        p_user_id: user.id,
+        p_date: today,
+        p_minutes: minutesStudied
+      });
 
-      if (existingSession) {
-        // Update existing session
-        const { error } = await supabase
-          .from('study_sessions')
-          .update({ minutes_studied: existingSession.minutes_studied + minutesStudied })
-          .eq('id', existingSession.id);
-        
-        if (error) throw error;
-      } else {
-        // Create new session
-        const { error } = await supabase
-          .from('study_sessions')
-          .insert({
-            user_id: user.id,
-            date: today,
-            minutes_studied: minutesStudied
-          });
-
-        if (error) throw error;
+      if (error) {
+        console.error('Error logging study session:', error);
+        return;
       }
 
+      // Refresh the sessions after successful update
       await fetchStudySessions();
     } catch (error) {
       console.error('Error logging study session:', error);
