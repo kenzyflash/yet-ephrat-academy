@@ -378,7 +378,11 @@ const CertificateGenerator = () => {
         
         {/* Hidden dialog for quick downloads */}
         <Dialog open={isPreviewOpen && isQuickDownload} onOpenChange={() => {}}>
-          <DialogContent className="max-w-5xl opacity-0 pointer-events-none">
+          <DialogContent className="max-w-5xl fixed opacity-0 pointer-events-none -z-10">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Certificate Generation</DialogTitle>
+              <DialogDescription>Generating certificate for download</DialogDescription>
+            </DialogHeader>
             {selectedCourse && <CertificatePreview course={selectedCourse} />}
           </DialogContent>
         </Dialog>
