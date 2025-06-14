@@ -45,6 +45,20 @@ export type Database = {
             referencedRelation: "assignments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_assignment_submissions_assignment_id"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_assignment_submissions_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       assignments: {
@@ -81,6 +95,20 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_assignments_course_id"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_assignments_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -250,7 +278,15 @@ export type Database = {
           total_lessons?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_courses_instructor_id"
+            columns: ["instructor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discussion_downvotes: {
         Row: {

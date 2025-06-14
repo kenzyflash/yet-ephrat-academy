@@ -57,23 +57,23 @@ const SubmissionManagement = () => {
     try {
       console.log('Fetching submissions for teacher:', user.id);
 
-      // Use a single query with joins to get all data efficiently
+      // Use the proper foreign key relationships to get all data efficiently
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
         .select(`
           *,
-          assignments!inner(
+          assignments!fk_assignment_submissions_assignment_id(
             id,
             title,
             due_date,
             course_id,
-            courses!inner(
+            courses!fk_assignments_course_id(
               id,
               title,
               instructor_id
             )
           ),
-          profiles!assignment_submissions_user_id_fkey(
+          profiles!fk_assignment_submissions_user_id(
             id,
             first_name,
             last_name
@@ -87,7 +87,7 @@ const SubmissionManagement = () => {
         throw submissionsError;
       }
 
-      console.log('Submissions data with joins:', submissionsData);
+      console.log('Submissions data with proper joins:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
