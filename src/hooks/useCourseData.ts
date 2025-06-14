@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { createEnrollmentWelcomeNotification } from '@/utils/notificationService';
 
 export interface Course {
   id: string;
@@ -175,6 +176,13 @@ export const useCourseData = () => {
           throw new Error('You are already enrolled in this course');
         }
         throw error;
+      }
+      
+      // Find the course name for the notification
+      const course = courses.find(c => c.id === courseId);
+      if (course) {
+        // Create welcome notification
+        await createEnrollmentWelcomeNotification(user.id, course.title);
       }
       
       // Refresh enrollments to ensure UI is updated

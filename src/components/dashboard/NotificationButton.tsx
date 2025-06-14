@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Notification {
   id: string;
@@ -26,12 +27,42 @@ const NotificationButton = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
       fetchNotifications();
+      
+      // Set up real-time subscription for new notifications
+      const channel = supabase
+        .channel('notifications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            const newNotification = payload.new as Notification;
+            setNotifications(prev => [newNotification, ...prev]);
+            setUnreadCount(prev => prev + 1);
+            
+            // Show toast for new notification
+            toast({
+              title: newNotification.title,
+              description: newNotification.message,
+            });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
-  }, [user]);
+  }, [user, toast]);
 
   const fetchNotifications = async () => {
     if (!user) return;
@@ -51,44 +82,17 @@ const NotificationButton = () => {
       setUnreadCount(notificationsData.filter(n => !n.is_read).length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      // Create mock notifications for demo
-      const mockNotifications = [
-        {
-          id: '1',
-          title: 'New Course Available',
-          message: 'Mathematics Fundamentals course is now available for enrollment.',
-          created_at: new Date().toISOString(),
-          is_read: false,
-          type: 'course'
-        },
-        {
-          id: '2',
-          title: 'Assignment Due',
-          message: 'Your English assignment is due tomorrow.',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          is_read: false,
-          type: 'assignment'
-        },
-        {
-          id: '3',
-          title: 'Grade Posted',
-          message: 'Your grade for Science Quiz has been posted.',
-          created_at: new Date(Date.now() - 7200000).toISOString(),
-          is_read: true,
-          type: 'grade'
-        }
-      ];
-      setNotifications(mockNotifications);
-      setUnreadCount(mockNotifications.filter(n => !n.is_read).length);
     }
   };
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
         .eq('id', notificationId);
+
+      if (error) throw error;
 
       setNotifications(prev => 
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
@@ -96,28 +100,23 @@ const NotificationButton = () => {
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      // For demo purposes, just update local state
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
     }
   };
 
   const markAllAsRead = async () => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('user_id', user?.id);
+        .eq('user_id', user?.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
 
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
-      // For demo purposes, just update local state
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
     }
   };
 
@@ -130,6 +129,21 @@ const NotificationButton = () => {
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'course_release':
+        return '📚';
+      case 'assignment':
+        return '📝';
+      case 'enrollment':
+        return '🎉';
+      case 'grade':
+        return '📊';
+      default:
+        return '📢';
+    }
   };
 
   return (
@@ -176,7 +190,8 @@ const NotificationButton = () => {
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <span>{getNotificationIcon(notification.type)}</span>
                       {notification.title}
                     </CardTitle>
                     {!notification.is_read && (

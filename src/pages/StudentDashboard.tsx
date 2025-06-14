@@ -28,6 +28,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import CourseEnrollment from "@/components/dashboard/CourseEnrollment";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useCourseData } from "@/hooks/useCourseData";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { useCourseProgress } from "@/hooks/useCourseProgress";
@@ -321,21 +322,7 @@ const StudentDashboard = () => {
   return (
     <ProtectedRoute requiredRole="student">
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <BookOpen className="h-8 w-8 text-emerald-600" />
-              <h1 className="text-2xl font-bold text-gray-800">SafHub</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <ProfileDropdown />
-            </div>
-          </div>
-        </header>
+        <DashboardHeader title="SafHub" />
 
         <div className="container mx-auto px-4 py-8">
           {/* Welcome Section */}
