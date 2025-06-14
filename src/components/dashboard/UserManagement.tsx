@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, UserCheck, Search, Edit } from 'lucide-react';
+import { Users, UserCheck, Search, Edit, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -38,6 +37,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('Fetching all users...');
       
       // Fetch all profiles from the database
       const { data: profiles, error: profilesError } = await supabase
@@ -58,6 +58,8 @@ const UserManagement = () => {
         throw profilesError;
       }
 
+      console.log('Fetched profiles:', profiles?.length || 0);
+
       // Fetch all user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
@@ -65,8 +67,10 @@ const UserManagement = () => {
 
       if (rolesError) {
         console.error('Error fetching user roles:', rolesError);
-        throw rolesError;
+        // Don't throw here, continue with empty roles
       }
+
+      console.log('Fetched user roles:', userRoles?.length || 0);
 
       // Create a map of user roles for faster lookup
       const roleMap = new Map();
@@ -80,20 +84,31 @@ const UserManagement = () => {
         role: roleMap.get(profile.id) || 'student'
       })) || [];
 
+      console.log('Users with roles:', usersWithRoles.length);
+
       // For users without roles in user_roles table, create the role entry
-      for (const user of usersWithRoles) {
-        if (!roleMap.has(user.id)) {
-          try {
-            await supabase
-              .from('user_roles')
-              .insert({ user_id: user.id, role: 'student' });
-          } catch (insertError) {
-            console.warn('Could not insert default role for user:', user.id, insertError);
-          }
+      const usersNeedingRoles = usersWithRoles.filter(user => !roleMap.has(user.id));
+      if (usersNeedingRoles.length > 0) {
+        console.log('Creating default roles for', usersNeedingRoles.length, 'users');
+        
+        const roleInserts = usersNeedingRoles.map(user => ({
+          user_id: user.id,
+          role: 'student'
+        }));
+
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert(roleInserts);
+
+        if (insertError) {
+          console.warn('Could not insert default roles:', insertError);
+        } else {
+          console.log('Successfully created default roles');
         }
       }
 
       setUsers(usersWithRoles);
+      console.log('Final user count:', usersWithRoles.length);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast({
@@ -118,31 +133,29 @@ const UserManagement = () => {
   const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
       setUpdatingRole(userId);
+      console.log(`Updating user ${userId} role to ${newRole}`);
       
-      // Update user role in database using upsert to handle both insert and update
-      const { error } = await supabase
+      // First, delete any existing role for this user
+      const { error: deleteError } = await supabase
         .from('user_roles')
-        .upsert({ 
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteError) {
+        console.error('Error deleting existing role:', deleteError);
+      }
+
+      // Then insert the new role
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert({ 
           user_id: userId, 
           role: newRole 
-        }, {
-          onConflict: 'user_id,role'
         });
 
-      if (error) {
-        // If upsert fails, try to delete existing role and insert new one
-        const { error: deleteError } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId);
-
-        if (deleteError) throw deleteError;
-
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: newRole });
-
-        if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting new role:', insertError);
+        throw insertError;
       }
 
       // Update local state
@@ -150,6 +163,7 @@ const UserManagement = () => {
         user.id === userId ? { ...user, role: newRole } : user
       ));
       
+      console.log(`Successfully updated user ${userId} role to ${newRole}`);
       toast({
         title: "Success",
         description: `User role has been updated to ${newRole}.`,
@@ -287,8 +301,17 @@ const UserManagement = () => {
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-600" />
             User Management
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchUsers}
+              className="ml-auto"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </CardTitle>
-          <CardDescription>Manage user accounts and permissions ({filteredUsers.length} users)</CardDescription>
+          <CardDescription>Manage user accounts and permissions ({filteredUsers.length} of {users.length} users)</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Filters */}
