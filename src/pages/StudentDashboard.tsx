@@ -161,14 +161,14 @@ const StudentDashboard = () => {
       // Get enrolled course IDs
       const enrolledCourseIds = enrollments.map(e => e.course_id);
 
-      // Get assignments for enrolled courses
+      // Get assignments for enrolled courses using proper foreign key relationship hints
       const { data: assignmentData, error } = await supabase
         .from('assignments')
         .select(`
           id,
           title,
           due_date,
-          courses (
+          courses!fk_assignments_course_id (
             title
           )
         `)
