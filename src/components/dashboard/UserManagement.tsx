@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, UserCheck, Search, Edit, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Users, UserCheck, Search, Edit, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,7 +30,6 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -39,9 +39,8 @@ const UserManagement = () => {
   const fetchAllUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching users with proper JOIN query...');
+      console.log('🔍 Fetching users with JOIN query...');
       
-      // Now we can use JOIN since the foreign key relationship exists
       const { data: joinedData, error: joinError } = await supabase
         .from('profiles')
         .select(`
@@ -61,12 +60,6 @@ const UserManagement = () => {
       if (!joinedData || joinedData.length === 0) {
         console.warn('⚠️ No profiles found in database');
         setUsers([]);
-        setDebugInfo({ 
-          profileCount: 0, 
-          rolesCount: 0, 
-          error: 'No profiles found',
-          strategy: 'join_query'
-        });
         toast({
           title: "No Users Found",
           description: "No user profiles were found in the database.",
@@ -83,8 +76,6 @@ const UserManagement = () => {
         console.log(`   - ID: ${profile.id}`);
         console.log(`   - Name: ${profile.first_name} ${profile.last_name}`);
         console.log(`   - Role: ${userRole}`);
-        console.log(`   - School: ${profile.school || 'None'}`);
-        console.log(`   - Grade: ${profile.grade || 'None'}`);
         
         return {
           id: profile.id,
@@ -101,28 +92,15 @@ const UserManagement = () => {
       console.log('✅ Final processed users:', processedUsers);
       console.log(`📊 Total users processed: ${processedUsers.length}`);
 
-      // Update state
       setUsers(processedUsers);
-      setDebugInfo({
-        profileCount: joinedData.length,
-        rolesCount: joinedData.filter(p => p.user_roles && p.user_roles.length > 0).length,
-        processedCount: processedUsers.length,
-        strategy: 'join_query_with_fk',
-        timestamp: new Date().toISOString()
-      });
       
       toast({
         title: "Users Loaded Successfully",
-        description: `Successfully loaded ${processedUsers.length} users using JOIN query.`,
+        description: `Successfully loaded ${processedUsers.length} users.`,
       });
       
     } catch (error) {
       console.error('💥 Critical error in fetchAllUsers:', error);
-      setDebugInfo({
-        error: error.message,
-        strategy: 'failed_join_query',
-        timestamp: new Date().toISOString()
-      });
       toast({
         title: "Error Loading Users",
         description: `Failed to load users: ${error.message}`,
@@ -131,78 +109,6 @@ const UserManagement = () => {
       setUsers([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Keep the alternative fetch as backup
-  const alternativeFetch = async () => {
-    try {
-      console.log('🔄 Trying alternative fetch method with direct queries...');
-      
-      // Fetch all profiles first
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*');
-      
-      if (profilesError) {
-        console.error('❌ Profiles query failed:', profilesError);
-        throw profilesError;
-      }
-      
-      console.log('📊 Profiles fetched:', profilesData?.length || 0);
-      
-      // Fetch all roles separately
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-      
-      if (rolesError) {
-        console.error('❌ Roles query failed:', rolesError);
-        // Don't throw error, just use default roles
-      }
-      
-      console.log('🎭 Roles fetched:', rolesData?.length || 0);
-      
-      // Create a map of user roles
-      const userRoleMap = new Map<string, string>();
-      rolesData?.forEach(roleEntry => {
-        userRoleMap.set(roleEntry.user_id, roleEntry.role);
-      });
-      
-      // Combine the data
-      const processedUsers = profilesData?.map(profile => ({
-        id: profile.id,
-        first_name: profile.first_name || 'Unknown',
-        last_name: profile.last_name || 'User',
-        email: profile.email || 'No email',
-        role: (userRoleMap.get(profile.id) || 'student') as 'student' | 'teacher' | 'admin',
-        created_at: profile.created_at,
-        school: profile.school,
-        grade: profile.grade
-      })) || [];
-      
-      setUsers(processedUsers);
-      setDebugInfo({
-        profileCount: profilesData?.length || 0,
-        rolesCount: rolesData?.length || 0,
-        processedCount: processedUsers.length,
-        strategy: 'direct_queries_backup',
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log('✅ Alternative fetch successful:', processedUsers);
-      
-      toast({
-        title: "Alternative Fetch Successful",
-        description: `Loaded ${processedUsers.length} users using direct queries method.`,
-      });
-    } catch (error) {
-      console.error('❌ Alternative fetch failed:', error);
-      toast({
-        title: "Alternative Fetch Failed",
-        description: `Failed to load users with alternative method: ${error.message}`,
-        variant: "destructive"
-      });
     }
   };
 
@@ -328,7 +234,7 @@ const UserManagement = () => {
         <CardContent className="p-6">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-            <p>Loading all users from database...</p>
+            <p>Loading users from database...</p>
           </div>
         </CardContent>
       </Card>
@@ -385,16 +291,7 @@ const UserManagement = () => {
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-600" />
             User Management
-            <div className="ml-auto flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={alternativeFetch}
-                className="text-orange-600"
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Try Alternative Method
-              </Button>
+            <div className="ml-auto">
               <Button
                 variant="outline"
                 size="sm"
@@ -402,7 +299,7 @@ const UserManagement = () => {
                 disabled={loading}
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh All Users
+                Refresh Users
               </Button>
             </div>
           </CardTitle>
@@ -437,28 +334,6 @@ const UserManagement = () => {
             </Select>
           </div>
 
-          {/* Enhanced Debug Status */}
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-            <h4 className="font-semibold mb-2">Database Status:</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p><strong>Profiles Found:</strong> {debugInfo.profileCount || 0}</p>
-                <p><strong>Roles Found:</strong> {debugInfo.rolesCount || 0}</p>
-                <p><strong>Processed Users:</strong> {debugInfo.processedCount || 0}</p>
-              </div>
-              <div>
-                <p><strong>Current Display:</strong> {filteredUsers.length} users</p>
-                <p><strong>Search Term:</strong> "{searchTerm || 'none'}"</p>
-                <p><strong>Role Filter:</strong> {roleFilter}</p>
-                <p><strong>Strategy:</strong> {debugInfo.strategy || 'unknown'}</p>
-              </div>
-            </div>
-            {debugInfo.error && (
-              <p className="text-red-600 mt-2"><strong>Error:</strong> {debugInfo.error}</p>
-            )}
-            <p className="text-xs text-gray-500 mt-2">Last updated: {debugInfo.timestamp}</p>
-          </div>
-
           {/* Users Table */}
           {filteredUsers.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -466,7 +341,7 @@ const UserManagement = () => {
               <p className="text-sm font-medium mb-1">No users found</p>
               <p className="text-xs">
                 {users.length === 0 
-                  ? "No users found in database. Try the 'Alternative Method' button above." 
+                  ? "No users found in database." 
                   : "Try adjusting your search or filter criteria."
                 }
               </p>
