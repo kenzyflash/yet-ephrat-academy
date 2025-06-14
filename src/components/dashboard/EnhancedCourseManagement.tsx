@@ -28,8 +28,15 @@ const EnhancedCourseManagement = () => {
     setActiveTab(value);
   };
 
-  if (loading) {
-    return <div>Loading courses...</div>;
+  // Don't show loading after initial load is complete
+  if (loading && courses.length === 0) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="text-center">Loading courses...</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
