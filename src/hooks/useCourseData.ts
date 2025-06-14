@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,62 +54,63 @@ export const useCourseData = () => {
 
   const fetchCourses = async () => {
     try {
-      // Fetch courses and filter out those with non-existent instructors
-      const { data, error } = await supabase
+      // First, get all courses
+      const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select(`
-          *,
-          profiles!courses_instructor_id_fkey (
-            id,
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
+        .not('instructor_id', 'is', null)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (coursesError) throw coursesError;
 
-      // Filter out courses where instructor doesn't exist in profiles
-      const validCourses = (data || []).filter(course => 
-        course.profiles && course.instructor_id
+      if (!coursesData || coursesData.length === 0) {
+        setCourses([]);
+        return;
+      }
+
+      // Get unique instructor IDs
+      const instructorIds = [...new Set(coursesData.map(course => course.instructor_id).filter(Boolean))];
+      
+      if (instructorIds.length === 0) {
+        setCourses([]);
+        return;
+      }
+
+      // Fetch instructor profiles separately
+      const { data: instructorProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', instructorIds);
+
+      if (profilesError) {
+        console.error('Error fetching instructor profiles:', profilesError);
+        // Continue with courses that have instructor_name already set
+        const validCourses = coursesData.filter(course => course.instructor_name);
+        setCourses(validCourses);
+        return;
+      }
+
+      // Create a map of instructor profiles
+      const profilesMap = new Map(
+        (instructorProfiles || []).map(profile => [
+          profile.id, 
+          `${profile.first_name} ${profile.last_name}`.trim()
+        ])
       );
+
+      // Filter and enhance courses with instructor names
+      const validCourses = coursesData.filter(course => {
+        // Keep courses that either have a valid instructor profile or already have instructor_name
+        return course.instructor_name || profilesMap.has(course.instructor_id);
+      }).map(course => ({
+        ...course,
+        instructor_name: course.instructor_name || profilesMap.get(course.instructor_id) || 'Unknown Instructor'
+      }));
 
       setCourses(validCourses);
     } catch (error) {
       console.error('Error fetching courses:', error);
-      // Fallback to basic query without join if the join fails
-      try {
-        const { data: basicCourses, error: basicError } = await supabase
-          .from('courses')
-          .select('*')
-          .not('instructor_id', 'is', null)
-          .order('created_at', { ascending: false });
-
-        if (basicError) throw basicError;
-
-        // Verify instructors exist in profiles table
-        const instructorIds = basicCourses?.map(c => c.instructor_id).filter(Boolean) || [];
-        
-        if (instructorIds.length > 0) {
-          const { data: validInstructors } = await supabase
-            .from('profiles')
-            .select('id')
-            .in('id', instructorIds);
-
-          const validInstructorIds = new Set(validInstructors?.map(p => p.id) || []);
-          
-          const filteredCourses = basicCourses?.filter(course => 
-            course.instructor_id && validInstructorIds.has(course.instructor_id)
-          ) || [];
-
-          setCourses(filteredCourses);
-        } else {
-          setCourses([]);
-        }
-      } catch (fallbackError) {
-        console.error('Error in fallback course fetch:', fallbackError);
-        setCourses([]);
-      }
+      setCourses([]);
     }
   };
 
