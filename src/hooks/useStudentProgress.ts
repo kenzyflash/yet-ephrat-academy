@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,17 +55,20 @@ export const useStudentProgress = () => {
       const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
       const weekStartString = weekStart.toISOString().split('T')[0];
 
-      const { data, error } = await supabase
+      // First, try to get existing goals
+      const { data: existingGoals, error: selectError } = await supabase
         .from('weekly_goals')
         .select('*')
         .eq('user_id', user.id)
         .eq('week_start_date', weekStartString)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (selectError && selectError.code !== 'PGRST116') {
+        throw selectError;
+      }
 
-      if (data) {
-        setCurrentGoals(data);
+      if (existingGoals) {
+        setCurrentGoals(existingGoals);
       } else {
         // Create default goals if none exist
         const defaultGoals = {
@@ -75,18 +77,33 @@ export const useStudentProgress = () => {
           assignments_goal: 3
         };
         
-        const { data: newGoals, error: insertError } = await supabase
+        // Use upsert to handle potential race conditions
+        const { data: newGoals, error: upsertError } = await supabase
           .from('weekly_goals')
-          .insert({
+          .upsert({
             user_id: user.id,
             week_start_date: weekStartString,
             ...defaultGoals
+          }, {
+            onConflict: 'user_id,week_start_date'
           })
           .select()
           .single();
 
-        if (insertError) throw insertError;
-        setCurrentGoals(newGoals);
+        if (upsertError) {
+          console.error('Error creating weekly goals:', upsertError);
+          // If upsert fails due to constraint, try to fetch existing record
+          const { data: fallbackGoals } = await supabase
+            .from('weekly_goals')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('week_start_date', weekStartString)
+            .single();
+          
+          setCurrentGoals(fallbackGoals || defaultGoals);
+        } else {
+          setCurrentGoals(newGoals);
+        }
       }
     } catch (error) {
       console.error('Error fetching current goals:', error);
@@ -187,6 +204,8 @@ export const useStudentProgress = () => {
           user_id: user.id,
           week_start_date: weekStartString,
           ...goals
+        }, {
+          onConflict: 'user_id,week_start_date'
         });
 
       if (error) throw error;

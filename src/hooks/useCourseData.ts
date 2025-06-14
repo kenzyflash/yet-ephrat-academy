@@ -55,15 +55,62 @@ export const useCourseData = () => {
 
   const fetchCourses = async () => {
     try {
+      // Fetch courses and filter out those with non-existent instructors
       const { data, error } = await supabase
         .from('courses')
-        .select('*')
+        .select(`
+          *,
+          profiles!courses_instructor_id_fkey (
+            id,
+            first_name,
+            last_name
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCourses(data || []);
+
+      // Filter out courses where instructor doesn't exist in profiles
+      const validCourses = (data || []).filter(course => 
+        course.profiles && course.instructor_id
+      );
+
+      setCourses(validCourses);
     } catch (error) {
       console.error('Error fetching courses:', error);
+      // Fallback to basic query without join if the join fails
+      try {
+        const { data: basicCourses, error: basicError } = await supabase
+          .from('courses')
+          .select('*')
+          .not('instructor_id', 'is', null)
+          .order('created_at', { ascending: false });
+
+        if (basicError) throw basicError;
+
+        // Verify instructors exist in profiles table
+        const instructorIds = basicCourses?.map(c => c.instructor_id).filter(Boolean) || [];
+        
+        if (instructorIds.length > 0) {
+          const { data: validInstructors } = await supabase
+            .from('profiles')
+            .select('id')
+            .in('id', instructorIds);
+
+          const validInstructorIds = new Set(validInstructors?.map(p => p.id) || []);
+          
+          const filteredCourses = basicCourses?.filter(course => 
+            course.instructor_id && validInstructorIds.has(course.instructor_id)
+          ) || [];
+
+          setCourses(filteredCourses);
+        } else {
+          setCourses([]);
+        }
+      } catch (fallbackError) {
+        console.error('Error in fallback course fetch:', fallbackError);
+        setCourses([]);
+      }
     }
   };
 
@@ -77,7 +124,14 @@ export const useCourseData = () => {
         .eq('user_id', user.id);
 
       if (error) throw error;
-      setEnrollments(data || []);
+
+      // Filter enrollments to only include courses that still exist
+      const courseIds = courses.map(c => c.id);
+      const validEnrollments = (data || []).filter(enrollment => 
+        courseIds.includes(enrollment.course_id)
+      );
+
+      setEnrollments(validEnrollments);
     } catch (error) {
       console.error('Error fetching enrollments:', error);
     } finally {
