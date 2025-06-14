@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Download, Eye, FileText, Calendar, User } from 'lucide-react';
+import { Download, Eye, FileText, Calendar, User, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +35,7 @@ const SubmissionManagement = () => {
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<AssignmentSubmission | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
@@ -44,75 +45,65 @@ const SubmissionManagement = () => {
     }
   }, [user]);
 
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = async (showRefreshing = false) => {
     if (!user) return;
 
+    if (showRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
-      // First, get all courses created by the teacher
-      const { data: teacherCourses, error: coursesError } = await supabase
-        .from('courses')
-        .select('id')
-        .eq('instructor_id', user.id);
+      console.log('Fetching submissions for teacher:', user.id);
 
-      if (coursesError) throw coursesError;
-
-      if (!teacherCourses || teacherCourses.length === 0) {
-        setSubmissions([]);
-        setLoading(false);
-        return;
-      }
-
-      const courseIds = teacherCourses.map(course => course.id);
-
-      // Get assignments for those courses
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select('id, title, course_id, due_date')
-        .in('course_id', courseIds);
-
-      if (assignmentsError) throw assignmentsError;
-
-      if (!assignments || assignments.length === 0) {
-        setSubmissions([]);
-        setLoading(false);
-        return;
-      }
-
-      const assignmentIds = assignments.map(assignment => assignment.id);
-
-      // Get submissions for those assignments
+      // Get submissions directly using the RLS policy
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
-        .select('*')
-        .in('assignment_id', assignmentIds)
+        .select(`
+          *,
+          assignments!inner(
+            id,
+            title,
+            due_date,
+            course_id,
+            courses!inner(
+              id,
+              title,
+              instructor_id
+            )
+          )
+        `)
         .order('submitted_at', { ascending: false });
 
-      if (submissionsError) throw submissionsError;
+      if (submissionsError) {
+        console.error('Error fetching submissions:', submissionsError);
+        throw submissionsError;
+      }
+
+      console.log('Raw submissions data:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
+        console.log('No submissions found');
         setSubmissions([]);
-        setLoading(false);
         return;
       }
 
-      // Get student profiles
+      // Get student profiles for the submissions
       const userIds = [...new Set(submissionsData.map(sub => sub.user_id))];
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
         .in('id', userIds);
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
 
-      // Get course titles
-      const { data: courses, error: courseTitlesError } = await supabase
-        .from('courses')
-        .select('id, title')
-        .in('id', courseIds);
+      console.log('Profiles data:', profiles);
 
-      if (courseTitlesError) throw courseTitlesError;
-
-      // Combine all data
+      // Create profiles map
       const profilesMap = new Map(
         (profiles || []).map(profile => [
           profile.id,
@@ -120,27 +111,34 @@ const SubmissionManagement = () => {
         ])
       );
 
-      const coursesMap = new Map(
-        (courses || []).map(course => [course.id, course.title])
-      );
+      // Transform submissions data
+      const enrichedSubmissions = submissionsData.map(submission => {
+        const assignment = submission.assignments;
+        const course = assignment?.courses;
+        
+        return {
+          ...submission,
+          assignment: {
+            id: assignment.id,
+            title: assignment.title,
+            course_id: assignment.course_id,
+            course_title: course?.title || 'Unknown Course',
+            due_date: assignment.due_date
+          },
+          student_name: profilesMap.get(submission.user_id) || 'Unknown Student'
+        };
+      });
 
-      const assignmentsMap = new Map(
-        assignments.map(assignment => [
-          assignment.id,
-          {
-            ...assignment,
-            course_title: coursesMap.get(assignment.course_id) || 'Unknown Course'
-          }
-        ])
-      );
-
-      const enrichedSubmissions = submissionsData.map(submission => ({
-        ...submission,
-        assignment: assignmentsMap.get(submission.assignment_id),
-        student_name: profilesMap.get(submission.user_id) || 'Unknown Student'
-      })).filter(submission => submission.assignment); // Filter out submissions without valid assignments
-
+      console.log('Enriched submissions:', enrichedSubmissions);
       setSubmissions(enrichedSubmissions);
+
+      if (showRefreshing) {
+        toast({
+          title: "Refreshed",
+          description: `Found ${enrichedSubmissions.length} submissions`,
+        });
+      }
+
     } catch (error) {
       console.error('Error fetching submissions:', error);
       toast({
@@ -150,7 +148,12 @@ const SubmissionManagement = () => {
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchSubmissions(true);
   };
 
   const handleDownload = async (submission: AssignmentSubmission) => {
@@ -205,13 +208,26 @@ const SubmissionManagement = () => {
   return (
     <Card className="bg-white/80 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-blue-600" />
-          Assignment Submissions
-        </CardTitle>
-        <CardDescription>
-          View and manage student assignment submissions
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              Assignment Submissions
+            </CardTitle>
+            <CardDescription>
+              View and manage student assignment submissions
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {submissions.length === 0 ? (
@@ -219,6 +235,15 @@ const SubmissionManagement = () => {
             <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-lg font-medium mb-2">No submissions yet</h3>
             <p>Student submissions will appear here once they start submitting assignments.</p>
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh}
+              className="mt-4"
+              disabled={refreshing}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Check for submissions
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">
