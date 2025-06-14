@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Users, UserCheck, Search, Edit, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,107 +39,83 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Starting to fetch all users and roles...');
+      console.log('🔍 Starting comprehensive user fetch...');
       
-      // Get ALL profiles from the database
-      const { data: profiles, error: profilesError } = await supabase
+      // First, get ALL profiles
+      const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📊 Profiles query result:', { profiles, error: profilesError });
+      console.log('📊 Raw profiles from database:', allProfiles);
+      console.log('❌ Profiles error (if any):', profilesError);
 
       if (profilesError) {
-        console.error('❌ Error fetching profiles:', profilesError);
+        console.error('Database error fetching profiles:', profilesError);
         throw profilesError;
       }
 
-      if (!profiles || profiles.length === 0) {
+      if (!allProfiles || allProfiles.length === 0) {
         console.warn('⚠️ No profiles found in database');
         setUsers([]);
         return;
       }
 
-      console.log(`✅ Found ${profiles.length} profiles:`, profiles);
-
-      // Get ALL user roles from the database
-      const { data: userRoles, error: rolesError } = await supabase
+      // Then, get ALL user roles
+      const { data: allRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
 
-      console.log('🎭 User roles query result:', { userRoles, error: rolesError });
+      console.log('🎭 Raw user roles from database:', allRoles);
+      console.log('❌ Roles error (if any):', rolesError);
 
       if (rolesError) {
-        console.error('❌ Error fetching user roles:', rolesError);
-        // Don't throw here, continue with empty roles
+        console.warn('Warning fetching roles:', rolesError);
       }
 
-      console.log(`✅ Found ${userRoles?.length || 0} user roles:`, userRoles);
-
-      // Create a map for quick role lookup
+      // Create role mapping
       const roleMap = new Map<string, string>();
-      if (userRoles && userRoles.length > 0) {
-        userRoles.forEach(roleEntry => {
+      if (allRoles && allRoles.length > 0) {
+        allRoles.forEach(roleEntry => {
           roleMap.set(roleEntry.user_id, roleEntry.role);
-          console.log(`👤 User ${roleEntry.user_id} has role: ${roleEntry.role}`);
+          console.log(`🔗 Role mapping: ${roleEntry.user_id} -> ${roleEntry.role}`);
         });
       }
 
-      console.log('🗺️ Role map created with entries:', roleMap.size);
+      console.log('🗺️ Complete role map:', Object.fromEntries(roleMap));
 
-      // Combine profiles with their roles
-      const usersWithRoles: User[] = profiles.map(profile => {
-        const userRole = roleMap.get(profile.id) || 'student';
-        console.log(`🔗 Mapping user ${profile.email} (${profile.id}) with role: ${userRole}`);
+      // Map each profile to a user with role
+      const completeUsersList: User[] = allProfiles.map(profile => {
+        const assignedRole = roleMap.get(profile.id) || 'student';
+        console.log(`👤 Processing user: ${profile.email} (${profile.id}) -> role: ${assignedRole}`);
         
         return {
           id: profile.id,
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
           email: profile.email || '',
-          role: userRole as 'student' | 'teacher' | 'admin',
+          role: assignedRole as 'student' | 'teacher' | 'admin',
           created_at: profile.created_at,
           school: profile.school || undefined,
           grade: profile.grade || undefined
         };
       });
 
-      console.log(`🎯 Final users array with ${usersWithRoles.length} users:`, usersWithRoles);
+      console.log(`✅ Complete users list (${completeUsersList.length} users):`, completeUsersList);
 
-      // Create default roles for users who don't have any
-      const usersWithoutRoles = usersWithRoles.filter(user => !roleMap.has(user.id));
+      // Set the users state
+      setUsers(completeUsersList);
       
-      if (usersWithoutRoles.length > 0) {
-        console.log(`🆕 Creating default roles for ${usersWithoutRoles.length} users:`, 
-          usersWithoutRoles.map(u => u.email));
-        
-        const defaultRoleInserts = usersWithoutRoles.map(user => ({
-          user_id: user.id,
-          role: 'student' as const
-        }));
-
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert(defaultRoleInserts);
-
-        if (insertError) {
-          console.warn('⚠️ Could not insert default roles:', insertError);
-        } else {
-          console.log('✅ Successfully created default student roles');
-        }
-      }
-
-      setUsers(usersWithRoles);
-      console.log(`🎉 Successfully loaded ${usersWithRoles.length} users into state`);
+      console.log('🎯 State updated with users:', completeUsersList.length);
       
     } catch (error) {
       console.error('💥 Critical error in fetchUsers:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch users. Please check the console for details.",
+        description: "Failed to fetch users. Check console for details.",
         variant: "destructive"
       });
-      setUsers([]); // Set empty array on error
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -152,12 +130,14 @@ const UserManagement = () => {
     return matchesSearch && matchesRole;
   });
 
+  console.log(`🔍 Filtered users for display: ${filteredUsers.length}`, filteredUsers);
+
   const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
       setUpdatingRole(userId);
       console.log(`🔄 Updating user ${userId} role to ${newRole}`);
       
-      // First, delete any existing role for this user
+      // Delete existing role
       const { error: deleteError } = await supabase
         .from('user_roles')
         .delete()
@@ -167,7 +147,7 @@ const UserManagement = () => {
         console.error('❌ Error deleting existing role:', deleteError);
       }
 
-      // Then insert the new role
+      // Insert new role
       const { error: insertError } = await supabase
         .from('user_roles')
         .insert({ 
@@ -185,7 +165,6 @@ const UserManagement = () => {
         user.id === userId ? { ...user, role: newRole } : user
       ));
       
-      console.log(`✅ Successfully updated user ${userId} role to ${newRole}`);
       toast({
         title: "Success",
         description: `User role has been updated to ${newRole}.`,
@@ -365,151 +344,141 @@ const UserManagement = () => {
             </Select>
           </div>
 
-          {/* Debug Info - Enhanced */}
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="font-semibold text-blue-800 mb-2">Database Status:</p>
-                <p>📊 Total users loaded: <span className="font-medium">{users.length}</span></p>
-                <p>🔍 Filtered users shown: <span className="font-medium">{filteredUsers.length}</span></p>
-                <p>🎭 Current role filter: <span className="font-medium">"{roleFilter}"</span></p>
-                <p>🔎 Search term: <span className="font-medium">"{searchTerm}"</span></p>
-              </div>
-              <div>
-                <p className="font-semibold text-blue-800 mb-2">Role Distribution:</p>
-                <p>👑 Admins: <span className="font-medium">{stats.byRole.admin || 0}</span></p>
-                <p>🎓 Teachers: <span className="font-medium">{stats.byRole.teacher || 0}</span></p>
-                <p>📚 Students: <span className="font-medium">{stats.byRole.student || 0}</span></p>
-              </div>
-            </div>
-            <div className="mt-3 p-2 bg-white rounded border">
-              <p className="text-xs text-gray-600">
-                💡 <strong>Tip:</strong> Check your browser console for detailed logs if users are missing.
-                Try clicking the "Refresh" button to reload all users from the database.
-              </p>
-            </div>
+          {/* Debug Info */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <p><strong>Debug:</strong> Found {users.length} total users, showing {filteredUsers.length} after filters</p>
+            <p><strong>Search:</strong> "{searchTerm}" | <strong>Role Filter:</strong> "{roleFilter}"</p>
           </div>
 
-          {/* Users List */}
-          <div className="space-y-4">
-            {filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm font-medium mb-1">No users found</p>
-                <p className="text-xs">
-                  {users.length === 0 
-                    ? "No users in database. Check console logs for errors." 
-                    : "Try adjusting your search or filter criteria, or click Refresh to reload users."
-                  }
-                </p>
-              </div>
-            ) : (
-              filteredUsers.map((user) => (
-                <div key={user.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-gray-800">
-                          {user.first_name} {user.last_name}
-                        </h3>
-                        <Badge className={getRoleBadgeColor(user.role)}>
-                          {user.role}
-                        </Badge>
+          {/* Users Table */}
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-sm font-medium mb-1">No users found</p>
+              <p className="text-xs">
+                {users.length === 0 
+                  ? "No users in database. Check console logs for errors." 
+                  : "Try adjusting your search or filter criteria, or click Refresh to reload users."
+                }
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>School</TableHead>
+                  <TableHead>Grade</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {user.first_name} {user.last_name}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge className={getRoleBadgeColor(user.role)}>
+                        {user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{user.school || '-'}</TableCell>
+                    <TableCell>{user.grade || '-'}</TableCell>
+                    <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Select
+                          value={user.role}
+                          onValueChange={(value) => handleUpdateUserRole(user.id, value as any)}
+                          disabled={updatingRole === user.id}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="student">Student</SelectItem>
+                            <SelectItem value="teacher">Teacher</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Dialog open={isEditDialogOpen && editingUser?.id === user.id} onOpenChange={setIsEditDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setEditingUser(user)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit User</DialogTitle>
+                              <DialogDescription>
+                                Update user information.
+                              </DialogDescription>
+                            </DialogHeader>
+                            {editingUser && (
+                              <div className="space-y-4">
+                                <div>
+                                  <label className="text-sm font-medium">First Name</label>
+                                  <Input
+                                    value={editingUser.first_name}
+                                    onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Last Name</label>
+                                  <Input
+                                    value={editingUser.last_name}
+                                    onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Email</label>
+                                  <Input
+                                    value={editingUser.email}
+                                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">School</label>
+                                  <Input
+                                    value={editingUser.school || ''}
+                                    onChange={(e) => setEditingUser({ ...editingUser, school: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-sm font-medium">Grade</label>
+                                  <Input
+                                    value={editingUser.grade || ''}
+                                    onChange={(e) => setEditingUser({ ...editingUser, grade: e.target.value })}
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button onClick={handleEditUser} className="bg-emerald-600 hover:bg-emerald-700">
+                                    Update User
+                                  </Button>
+                                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
                       </div>
-                      <p className="text-sm text-gray-600 mb-1">{user.email}</p>
-                      <div className="flex gap-4 text-xs text-gray-500">
-                        <span>Joined: {new Date(user.created_at).toLocaleDateString()}</span>
-                        {user.school && <span>School: {user.school}</span>}
-                        {user.grade && <span>Grade: {user.grade}</span>}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Select
-                        value={user.role}
-                        onValueChange={(value) => handleUpdateUserRole(user.id, value as any)}
-                        disabled={updatingRole === user.id}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="teacher">Teacher</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Dialog open={isEditDialogOpen && editingUser?.id === user.id} onOpenChange={setIsEditDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setEditingUser(user)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit User</DialogTitle>
-                            <DialogDescription>
-                              Update user information.
-                            </DialogDescription>
-                          </DialogHeader>
-                          {editingUser && (
-                            <div className="space-y-4">
-                              <div>
-                                <label className="text-sm font-medium">First Name</label>
-                                <Input
-                                  value={editingUser.first_name}
-                                  onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-sm font-medium">Last Name</label>
-                                <Input
-                                  value={editingUser.last_name}
-                                  onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-sm font-medium">Email</label>
-                                <Input
-                                  value={editingUser.email}
-                                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-sm font-medium">School</label>
-                                <Input
-                                  value={editingUser.school || ''}
-                                  onChange={(e) => setEditingUser({ ...editingUser, school: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="text-sm font-medium">Grade</label>
-                                <Input
-                                  value={editingUser.grade || ''}
-                                  onChange={(e) => setEditingUser({ ...editingUser, grade: e.target.value })}
-                                />
-                              </div>
-                              <div className="flex gap-2">
-                                <Button onClick={handleEditUser} className="bg-emerald-600 hover:bg-emerald-700">
-                                  Update User
-                                </Button>
-                                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
