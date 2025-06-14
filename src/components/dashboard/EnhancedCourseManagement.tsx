@@ -7,13 +7,26 @@ import CourseManagement from './CourseManagement';
 import LessonManagement from './LessonManagement';
 import AssignmentManagement from './AssignmentManagement';
 import { useCourseData } from '@/hooks/useCourseData';
+import { useAuth } from '@/contexts/AuthContext';
 
 const EnhancedCourseManagement = () => {
+  const { user } = useAuth();
   const { courses, loading } = useCourseData();
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [activeTab, setActiveTab] = useState('courses');
 
-  const selectedCourse = courses.find(course => course.id === selectedCourseId);
+  // Filter courses to show only those created by the current user
+  const userCourses = courses.filter(course => course.instructor_id === user?.id);
+  const selectedCourse = userCourses.find(course => course.id === selectedCourseId);
+
+  // Auto-switch to courses tab when no course is selected and user tries to access other tabs
+  const handleTabChange = (value: string) => {
+    if ((value === 'lessons' || value === 'assignments' || value === 'settings') && !selectedCourseId) {
+      // Don't allow switching to these tabs without a selected course
+      return;
+    }
+    setActiveTab(value);
+  };
 
   if (loading) {
     return <div>Loading courses...</div>;
@@ -21,28 +34,73 @@ const EnhancedCourseManagement = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="courses" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
             Courses
           </TabsTrigger>
-          <TabsTrigger value="lessons" className="flex items-center gap-2" disabled={!selectedCourseId}>
+          <TabsTrigger 
+            value="lessons" 
+            className="flex items-center gap-2" 
+            disabled={!selectedCourseId}
+          >
             <Video className="h-4 w-4" />
             Lessons
+            {selectedCourse && (
+              <span className="ml-1 text-xs bg-blue-100 text-blue-800 px-1 rounded">
+                {selectedCourse.title.length > 10 ? selectedCourse.title.substring(0, 10) + '...' : selectedCourse.title}
+              </span>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="assignments" className="flex items-center gap-2" disabled={!selectedCourseId}>
+          <TabsTrigger 
+            value="assignments" 
+            className="flex items-center gap-2" 
+            disabled={!selectedCourseId}
+          >
             <FileText className="h-4 w-4" />
             Assignments
+            {selectedCourse && (
+              <span className="ml-1 text-xs bg-purple-100 text-purple-800 px-1 rounded">
+                {selectedCourse.title.length > 10 ? selectedCourse.title.substring(0, 10) + '...' : selectedCourse.title}
+              </span>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2" disabled={!selectedCourseId}>
+          <TabsTrigger 
+            value="settings" 
+            className="flex items-center gap-2" 
+            disabled={!selectedCourseId}
+          >
             <Settings className="h-4 w-4" />
             Settings
+            {selectedCourse && (
+              <span className="ml-1 text-xs bg-gray-100 text-gray-800 px-1 rounded">
+                {selectedCourse.title.length > 10 ? selectedCourse.title.substring(0, 10) + '...' : selectedCourse.title}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="courses" className="space-y-4">
-          <CourseManagement onCourseSelect={setSelectedCourseId} />
+          <CourseManagement 
+            onCourseSelect={(courseId) => {
+              setSelectedCourseId(courseId);
+              console.log('Course selected:', courseId);
+            }} 
+          />
+          {selectedCourse && (
+            <Card className="bg-emerald-50 border-emerald-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <BookOpen className="h-4 w-4" />
+                  <span className="font-medium">Selected Course: {selectedCourse.title}</span>
+                </div>
+                <p className="text-sm text-emerald-600 mt-1">
+                  You can now manage lessons and assignments for this course using the tabs above.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="lessons" className="space-y-4">
