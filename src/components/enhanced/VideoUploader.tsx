@@ -30,6 +30,16 @@ const VideoUploader = ({ onUploadComplete, onUploadStart }: VideoUploaderProps) 
       return;
     }
 
+    // Check file size (100MB limit)
+    if (file.size > 104857600) {
+      toast({
+        title: "File too large",
+        description: "Please select a video file smaller than 100MB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setUploading(true);
     setFileName(file.name);
     setProgress(0);
