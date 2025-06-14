@@ -28,18 +28,138 @@ const CertificateGenerator = () => {
     setIsPreviewOpen(true);
   };
 
-  const downloadCertificate = () => {
-    if (!selectedCourse) return;
+  const downloadCertificate = async () => {
+    if (!selectedCourse || !certificateRef.current) return;
 
-    // In a real app, this would generate a PDF
-    toast({
-      title: "Certificate Downloaded",
-      description: `Certificate for ${selectedCourse.title} has been downloaded.`
-    });
+    try {
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({
+          title: "Error",
+          description: "Please allow pop-ups to download the certificate.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Get the certificate HTML content
+      const certificateContent = certificateRef.current.outerHTML;
+      
+      // Create the print document
+      const printDocument = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Certificate - ${selectedCourse.title}</title>
+            <meta charset="utf-8">
+            <style>
+              @media print {
+                @page {
+                  size: A4 landscape;
+                  margin: 0;
+                }
+                body {
+                  margin: 0;
+                  padding: 20px;
+                  font-family: system-ui, -apple-system, sans-serif;
+                }
+              }
+              body {
+                margin: 0;
+                padding: 20px;
+                font-family: system-ui, -apple-system, sans-serif;
+                background: white;
+              }
+              .bg-white { background-color: white; }
+              .p-8 { padding: 2rem; }
+              .border-8 { border-width: 8px; }
+              .border-yellow-400 { border-color: #facc15; }
+              .rounded-lg { border-radius: 0.5rem; }
+              .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+              .max-w-4xl { max-width: 56rem; }
+              .mx-auto { margin-left: auto; margin-right: auto; }
+              .text-center { text-align: center; }
+              .space-y-6 > * + * { margin-top: 1.5rem; }
+              .space-y-4 > * + * { margin-top: 1rem; }
+              .border-b-4 { border-bottom-width: 4px; }
+              .pb-4 { padding-bottom: 1rem; }
+              .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+              .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+              .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+              .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+              .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+              .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+              .font-bold { font-weight: 700; }
+              .font-semibold { font-weight: 600; }
+              .text-gray-800 { color: #1f2937; }
+              .text-gray-700 { color: #374151; }
+              .text-gray-600 { color: #4b5563; }
+              .text-gray-400 { color: #9ca3af; }
+              .text-emerald-600 { color: #059669; }
+              .text-yellow-500 { color: #eab308; }
+              .mb-2 { margin-bottom: 0.5rem; }
+              .mb-4 { margin-bottom: 1rem; }
+              .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+              .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+              .px-8 { padding-left: 2rem; padding-right: 2rem; }
+              .p-4 { padding: 1rem; }
+              .pt-8 { padding-top: 2rem; }
+              .pt-2 { padding-top: 0.5rem; }
+              .border-b-2 { border-bottom-width: 2px; }
+              .border-t-2 { border-top-width: 2px; }
+              .border-2 { border-width: 2px; }
+              .border-gray-300 { border-color: #d1d5db; }
+              .border-gray-200 { border-color: #e5e7eb; }
+              .border-gray-400 { border-color: #9ca3af; }
+              .border-yellow-200 { border-color: #fef3c7; }
+              .inline-block { display: inline-block; }
+              .bg-yellow-50 { background-color: #fefce8; }
+              .rounded-lg { border-radius: 0.5rem; }
+              .flex { display: flex; }
+              .justify-between { justify-content: space-between; }
+              .items-end { align-items: flex-end; }
+              .w-48 { width: 12rem; }
+              .h-16 { height: 4rem; }
+              .w-16 { width: 4rem; }
+              .mb-2 { margin-bottom: 0.5rem; }
+            </style>
+          </head>
+          <body>
+            ${certificateContent}
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(function() {
+                  window.close();
+                }, 1000);
+              }
+            </script>
+          </body>
+        </html>
+      `;
+
+      // Write the document and trigger print
+      printWindow.document.write(printDocument);
+      printWindow.document.close();
+
+      toast({
+        title: "Certificate Download Started",
+        description: `Certificate for ${selectedCourse.title} is being prepared for download. Use your browser's print dialog to save as PDF.`
+      });
+
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      toast({
+        title: "Download Error",
+        description: "There was an error preparing your certificate for download.",
+        variant: "destructive"
+      });
+    }
   };
 
   const printCertificate = () => {
-    window.print();
+    downloadCertificate();
   };
 
   const CertificatePreview = ({ course }: { course: any }) => {
@@ -192,7 +312,10 @@ const CertificateGenerator = () => {
                         <Button 
                           size="sm" 
                           className="bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => generateCertificate(course)}
+                          onClick={() => {
+                            setSelectedCourse(course);
+                            downloadCertificate();
+                          }}
                         >
                           <Download className="mr-1 h-4 w-4" />
                           Download
