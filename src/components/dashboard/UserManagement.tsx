@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -162,49 +161,60 @@ const UserManagement = () => {
     }
   };
 
-  // Alternative fetch method using different approach
+  // Alternative fetch method using JOIN approach
   const alternativeFetch = async () => {
     try {
-      console.log('🔄 Trying alternative fetch method...');
+      console.log('🔄 Trying alternative fetch method with JOIN...');
       
-      // Use RPC or function call if available
-      const { data: userData, error } = await supabase
-        .rpc('get_all_users_with_roles')
-        .single();
+      // Try with LEFT JOIN
+      const { data: joinedData, error: joinError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles (
+            role
+          )
+        `);
       
-      if (error) {
-        console.log('RPC not available, using JOIN approach...');
-        
-        // Try with LEFT JOIN
-        const { data: joinedData, error: joinError } = await supabase
-          .from('profiles')
-          .select(`
-            *,
-            user_roles (
-              role
-            )
-          `);
-        
-        if (joinError) throw joinError;
-        
-        console.log('🔗 Joined data:', joinedData);
-        
-        const processedUsers = joinedData?.map(profile => ({
-          id: profile.id,
-          first_name: profile.first_name || 'Unknown',
-          last_name: profile.last_name || 'User',
-          email: profile.email || 'No email',
-          role: (profile.user_roles?.[0]?.role || 'student') as 'student' | 'teacher' | 'admin',
-          created_at: profile.created_at,
-          school: profile.school,
-          grade: profile.grade
-        })) || [];
-        
-        setUsers(processedUsers);
-        console.log('✅ Alternative fetch successful:', processedUsers);
+      if (joinError) {
+        console.error('❌ JOIN query failed:', joinError);
+        throw joinError;
       }
+      
+      console.log('🔗 Joined data:', joinedData);
+      
+      const processedUsers = joinedData?.map(profile => ({
+        id: profile.id,
+        first_name: profile.first_name || 'Unknown',
+        last_name: profile.last_name || 'User',
+        email: profile.email || 'No email',
+        role: (profile.user_roles?.[0]?.role || 'student') as 'student' | 'teacher' | 'admin',
+        created_at: profile.created_at,
+        school: profile.school,
+        grade: profile.grade
+      })) || [];
+      
+      setUsers(processedUsers);
+      setDebugInfo({
+        profileCount: joinedData?.length || 0,
+        processedCount: processedUsers.length,
+        strategy: 'join_fetch',
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('✅ Alternative fetch successful:', processedUsers);
+      
+      toast({
+        title: "Alternative Fetch Successful",
+        description: `Loaded ${processedUsers.length} users using JOIN method.`,
+      });
     } catch (error) {
       console.error('❌ Alternative fetch failed:', error);
+      toast({
+        title: "Alternative Fetch Failed",
+        description: `Failed to load users with alternative method: ${error.message}`,
+        variant: "destructive"
+      });
     }
   };
 
