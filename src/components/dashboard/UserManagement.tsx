@@ -21,6 +21,17 @@ interface User {
   grade?: string;
 }
 
+interface ProfileWithRoles {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at: string;
+  school?: string;
+  grade?: string;
+  user_roles: Array<{ role: string }>;
+}
+
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +194,7 @@ const UserManagement = () => {
       
       console.log('🔗 Joined data:', joinedData);
       
-      const processedUsers = joinedData?.map(profile => ({
+      const processedUsers = (joinedData as ProfileWithRoles[])?.map(profile => ({
         id: profile.id,
         first_name: profile.first_name || 'Unknown',
         last_name: profile.last_name || 'User',
