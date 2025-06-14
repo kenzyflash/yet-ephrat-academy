@@ -19,6 +19,7 @@ const CertificateGenerator = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState('');
+  const [isQuickDownload, setIsQuickDownload] = useState(false);
   const certificateRef = useRef<HTMLDivElement>(null);
 
   // Get completed courses (progress = 100%)
@@ -33,10 +34,10 @@ const CertificateGenerator = () => {
   };
 
   const downloadCertificate = async () => {
-    if (!selectedCourse || !certificateRef.current) {
+    if (!selectedCourse) {
       toast({
         title: "Error",
-        description: "Certificate not ready. Please try again.",
+        description: "No course selected. Please try again.",
         variant: "destructive"
       });
       return;
@@ -51,12 +52,19 @@ const CertificateGenerator = () => {
         description: "Generating your certificate PDF...",
       });
 
-      setDownloadProgress('Capturing certificate image...');
+      setDownloadProgress('Preparing certificate layout...');
       console.log('Starting certificate generation for:', selectedCourse.title);
       
-      // Wait a moment for the dialog to fully render
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for the certificate element to be rendered
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
+      // Check if certificate ref is available
+      if (!certificateRef.current) {
+        throw new Error('Certificate preview not ready. Please try again.');
+      }
+
+      setDownloadProgress('Capturing certificate image...');
+      
       // Create canvas from the certificate element
       const canvas = await html2canvas(certificateRef.current, {
         scale: 2,
@@ -134,11 +142,17 @@ const CertificateGenerator = () => {
 
       console.log('Certificate download completed successfully');
 
+      // If it was a quick download, close the hidden dialog
+      if (isQuickDownload) {
+        setIsPreviewOpen(false);
+        setIsQuickDownload(false);
+      }
+
     } catch (error) {
       console.error('Error generating certificate:', error);
       toast({
         title: "Download Failed",
-        description: "There was an error generating your certificate. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error generating your certificate. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -149,9 +163,13 @@ const CertificateGenerator = () => {
 
   const quickDownload = async (course: any) => {
     setSelectedCourse(course);
-    // Wait for selectedCourse state to update
-    await new Promise(resolve => setTimeout(resolve, 100));
-    await downloadCertificate();
+    setIsQuickDownload(true);
+    setIsPreviewOpen(true);
+    
+    // Wait for the dialog to render and then start download
+    setTimeout(() => {
+      downloadCertificate();
+    }, 100);
   };
 
   const CertificatePreview = ({ course }: { course: any }) => {
@@ -287,7 +305,7 @@ const CertificateGenerator = () => {
                       </div>
                       
                       <div className="flex gap-2">
-                        <Dialog open={isPreviewOpen && selectedCourse?.id === course.id} onOpenChange={setIsPreviewOpen}>
+                        <Dialog open={isPreviewOpen && selectedCourse?.id === course.id && !isQuickDownload} onOpenChange={setIsPreviewOpen}>
                           <DialogTrigger asChild>
                             <Button 
                               size="sm" 
@@ -357,6 +375,13 @@ const CertificateGenerator = () => {
             })}
           </div>
         )}
+        
+        {/* Hidden dialog for quick downloads */}
+        <Dialog open={isPreviewOpen && isQuickDownload} onOpenChange={() => {}}>
+          <DialogContent className="max-w-5xl opacity-0 pointer-events-none">
+            {selectedCourse && <CertificatePreview course={selectedCourse} />}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
