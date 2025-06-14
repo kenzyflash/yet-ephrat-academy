@@ -1,4 +1,3 @@
-
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +29,7 @@ const TeacherDashboard = () => {
   const { courses, loading: coursesLoading } = useCourseData();
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   // Filter courses to show only those created by the current user
   const userCourses = courses.filter(course => course.instructor_id === user?.id);
@@ -47,12 +47,15 @@ const TeacherDashboard = () => {
     { label: "Total Lessons", value: userCourses.reduce((sum, course) => sum + (course.total_lessons || 0), 0).toString(), icon: TrendingUp, color: "text-orange-600" }
   ];
 
-  // Fetch recent activities when user and courses are available
+  // Set initial load flag when courses are loaded for the first time
   useEffect(() => {
-    if (user && userCourses.length > 0) {
-      fetchRecentActivities();
+    if (!coursesLoading && !hasInitiallyLoaded) {
+      setHasInitiallyLoaded(true);
+      if (user && userCourses.length > 0) {
+        fetchRecentActivities();
+      }
     }
-  }, [user, userCourses.length]);
+  }, [coursesLoading, hasInitiallyLoaded, user, userCourses.length]);
 
   const fetchRecentActivities = async () => {
     if (!user || userCourses.length === 0) {
@@ -184,8 +187,8 @@ const TeacherDashboard = () => {
     }
   };
 
-  // Only show loading for initial course load
-  if (coursesLoading) {
+  // Only show loading on the very first load when we have no data at all
+  if (coursesLoading && !hasInitiallyLoaded) {
     return (
       <ProtectedRoute requiredRole="teacher">
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
