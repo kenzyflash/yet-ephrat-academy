@@ -92,17 +92,10 @@ const SubmissionManagement = () => {
       const assignmentIds = teacherAssignments.map(assignment => assignment.id);
       console.log('Assignment IDs for teacher:', assignmentIds);
 
-      // Now get all submissions for these assignments with student profiles
+      // Get all submissions for these assignments
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
-        .select(`
-          *,
-          profiles!fk_assignment_submissions_user_id(
-            id,
-            first_name,
-            last_name
-          )
-        `)
+        .select('*')
         .in('assignment_id', assignmentIds)
         .order('submitted_at', { ascending: false });
 
@@ -111,7 +104,7 @@ const SubmissionManagement = () => {
         throw submissionsError;
       }
 
-      console.log('Submissions data with profiles:', submissionsData);
+      console.log('Raw submissions data:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
@@ -125,15 +118,39 @@ const SubmissionManagement = () => {
         return;
       }
 
+      // Get unique user IDs from submissions
+      const userIds = [...new Set(submissionsData.map(sub => sub.user_id))];
+      console.log('User IDs from submissions:', userIds);
+
+      // Fetch student profiles separately
+      const { data: studentProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching student profiles:', profilesError);
+        throw profilesError;
+      }
+
+      console.log('Student profiles:', studentProfiles);
+
       // Transform the data to match our interface
       const enrichedSubmissions = submissionsData.map((submission: any) => {
         const assignment = teacherAssignments.find(a => a.id === submission.assignment_id);
         const course = assignment?.courses;
-        const profile = submission.profiles;
+        const studentProfile = studentProfiles?.find(p => p.id === submission.user_id);
         
-        const studentName = profile 
-          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+        const studentName = studentProfile 
+          ? `${studentProfile.first_name || ''} ${studentProfile.last_name || ''}`.trim()
           : 'Unknown Student';
+
+        console.log(`Processing submission ${submission.id}:`, {
+          assignment_id: submission.assignment_id,
+          user_id: submission.user_id,
+          studentProfile,
+          studentName
+        });
 
         return {
           id: submission.id,
@@ -150,11 +167,11 @@ const SubmissionManagement = () => {
             course_title: course?.title || 'Unknown Course',
             due_date: assignment?.due_date || ''
           },
-          student_name: studentName || 'Unknown Student'
+          student_name: studentName
         };
       });
 
-      console.log('Enriched submissions:', enrichedSubmissions);
+      console.log('Final enriched submissions:', enrichedSubmissions);
       setSubmissions(enrichedSubmissions);
 
       if (showRefreshing) {
