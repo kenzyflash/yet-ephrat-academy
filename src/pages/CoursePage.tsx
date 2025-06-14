@@ -130,14 +130,21 @@ const CoursePage = () => {
     if (!user || !courseId) return;
 
     try {
-      await supabase
+      // Use upsert to avoid duplicate key violations
+      const { error } = await supabase
         .from('lesson_progress')
         .upsert({
           user_id: user.id,
           lesson_id: lessonId,
           course_id: courseId,
           watch_time_minutes: minutes
+        }, {
+          onConflict: 'user_id,lesson_id'
         });
+
+      if (error) {
+        console.error('Error updating watch time:', error);
+      }
     } catch (error) {
       console.error('Error updating watch time:', error);
     }
@@ -147,7 +154,8 @@ const CoursePage = () => {
     if (!user || !courseId) return;
 
     try {
-      await supabase
+      // Use upsert to avoid duplicate key violations
+      const { error } = await supabase
         .from('lesson_progress')
         .upsert({
           user_id: user.id,
@@ -155,7 +163,11 @@ const CoursePage = () => {
           course_id: courseId,
           completed: true,
           completed_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,lesson_id'
         });
+
+      if (error) throw error;
 
       await fetchLessonProgress();
       
