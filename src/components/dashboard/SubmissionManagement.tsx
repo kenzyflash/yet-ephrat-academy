@@ -57,53 +57,29 @@ const SubmissionManagement = () => {
     try {
       console.log('Fetching submissions for teacher:', user.id);
 
-      // First, get all courses taught by this teacher
-      const { data: teacherCourses, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, title')
-        .eq('instructor_id', user.id);
-
-      if (coursesError) {
-        console.error('Error fetching teacher courses:', coursesError);
-        throw coursesError;
-      }
-
-      console.log('Teacher courses:', teacherCourses);
-
-      if (!teacherCourses || teacherCourses.length === 0) {
-        console.log('No courses found for teacher');
-        setSubmissions([]);
-        return;
-      }
-
-      const courseIds = teacherCourses.map(course => course.id);
-
-      // Get assignments for these courses
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select('id, title, due_date, course_id')
-        .in('course_id', courseIds);
-
-      if (assignmentsError) {
-        console.error('Error fetching assignments:', assignmentsError);
-        throw assignmentsError;
-      }
-
-      console.log('Assignments:', assignments);
-
-      if (!assignments || assignments.length === 0) {
-        console.log('No assignments found for teacher courses');
-        setSubmissions([]);
-        return;
-      }
-
-      const assignmentIds = assignments.map(assignment => assignment.id);
-
-      // Get submissions for these assignments
+      // Use a single query with joins to get all data efficiently
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
-        .select('*')
-        .in('assignment_id', assignmentIds)
+        .select(`
+          *,
+          assignments!inner(
+            id,
+            title,
+            due_date,
+            course_id,
+            courses!inner(
+              id,
+              title,
+              instructor_id
+            )
+          ),
+          profiles!assignment_submissions_user_id_fkey(
+            id,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('assignments.courses.instructor_id', user.id)
         .order('submitted_at', { ascending: false });
 
       if (submissionsError) {
@@ -111,51 +87,38 @@ const SubmissionManagement = () => {
         throw submissionsError;
       }
 
-      console.log('Submissions data:', submissionsData);
+      console.log('Submissions data with joins:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
         setSubmissions([]);
+        if (showRefreshing) {
+          toast({
+            title: "Refreshed",
+            description: "No submissions found",
+          });
+        }
         return;
       }
 
-      // Get student profiles for the submissions
-      const userIds = [...new Set(submissionsData.map(sub => sub.user_id))];
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-
-      console.log('Profiles data:', profiles);
-
-      // Create lookup maps
-      const profilesMap = new Map(
-        (profiles || []).map(profile => [
-          profile.id,
-          `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Student'
-        ])
-      );
-
-      const assignmentsMap = new Map(
-        assignments.map(assignment => [assignment.id, assignment])
-      );
-
-      const coursesMap = new Map(
-        teacherCourses.map(course => [course.id, course])
-      );
-
-      // Transform submissions data
-      const enrichedSubmissions = submissionsData.map(submission => {
-        const assignment = assignmentsMap.get(submission.assignment_id);
-        const course = assignment ? coursesMap.get(assignment.course_id) : null;
+      // Transform the data to match our interface
+      const enrichedSubmissions = submissionsData.map((submission: any) => {
+        const assignment = submission.assignments;
+        const course = assignment?.courses;
+        const profile = submission.profiles;
         
+        const studentName = profile 
+          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+          : 'Unknown Student';
+
         return {
-          ...submission,
+          id: submission.id,
+          assignment_id: submission.assignment_id,
+          user_id: submission.user_id,
+          file_url: submission.file_url,
+          file_name: submission.file_name,
+          file_type: submission.file_type,
+          submitted_at: submission.submitted_at,
           assignment: {
             id: assignment?.id || '',
             title: assignment?.title || 'Unknown Assignment',
@@ -163,7 +126,7 @@ const SubmissionManagement = () => {
             course_title: course?.title || 'Unknown Course',
             due_date: assignment?.due_date || ''
           },
-          student_name: profilesMap.get(submission.user_id) || 'Unknown Student'
+          student_name: studentName || 'Unknown Student'
         };
       });
 
@@ -184,6 +147,7 @@ const SubmissionManagement = () => {
         description: "Failed to fetch assignment submissions",
         variant: "destructive"
       });
+      setSubmissions([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
