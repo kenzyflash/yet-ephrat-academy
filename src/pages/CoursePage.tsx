@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -212,21 +213,25 @@ const CoursePage = () => {
     if (!user || !courseId) return;
 
     try {
-      // Update the lesson progress to mark as incomplete
-      const { error } = await supabase
+      console.log('Removing completion for lesson:', lessonId);
+      
+      // First try to update existing record
+      const { error: updateError } = await supabase
         .from('lesson_progress')
-        .upsert({
-          user_id: user.id,
-          lesson_id: lessonId,
-          course_id: courseId,
+        .update({
           completed: false,
           completed_at: null
-        }, {
-          onConflict: 'user_id,lesson_id'
-        });
+        })
+        .eq('user_id', user.id)
+        .eq('lesson_id', lessonId)
+        .eq('course_id', courseId);
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
 
+      // Refresh the lesson progress data
       await fetchLessonProgress();
 
       toast({
