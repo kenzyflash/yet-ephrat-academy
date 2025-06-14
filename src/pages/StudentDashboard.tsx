@@ -70,7 +70,10 @@ const StudentDashboard = () => {
     streak, 
     updateWeeklyGoals,
     refetchProgress,
-    logStudySession
+    logStudySession,
+    getTotalStudyHours,
+    getTotalStudyMinutes,
+    getWeeklyStudyProgress
   } = useStudentProgress();
   const { courseProgress, getCourseProgress } = useCourseProgress();
 
@@ -205,23 +208,22 @@ const StudentDashboard = () => {
   const getWeeklyProgress = () => {
     if (!currentGoals) return { studyHours: 0, lessons: 0, assignments: 0 };
 
-    // Get current week's sessions
-    const today = new Date();
-    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
-    
-    const thisWeekSessions = studySessions.filter(session => {
-      const sessionDate = new Date(session.date);
-      return sessionDate >= weekStart;
-    });
-
-    const totalMinutes = thisWeekSessions.reduce((sum, session) => sum + session.minutes_studied, 0);
-    const studyHours = Math.floor(totalMinutes / 60);
+    // Use the improved weekly study progress calculation
+    const weeklyStudy = getWeeklyStudyProgress();
+    const studyHours = weeklyStudy.hours;
 
     // Calculate lessons completed this week (simplified)
     const lessonsCompleted = Math.min(Math.floor(studyHours / 2), currentGoals.lessons_goal);
     
     // Get assignments completed
     const assignmentsCompleted = assignments.filter(a => a.status === 'submitted').length;
+
+    console.log('Weekly progress calculated:', {
+      studyHours,
+      lessonsCompleted,
+      assignmentsCompleted,
+      weeklyStudy
+    });
 
     return {
       studyHours: Math.min(studyHours, currentGoals.study_hours_goal),
@@ -267,9 +269,16 @@ const StudentDashboard = () => {
   const enrolledCourses = getEnrolledCourses();
   const weeklyProgress = getWeeklyProgress();
 
-  // Calculate total study time in hours
-  const totalStudyMinutes = studySessions.reduce((sum, s) => sum + s.minutes_studied, 0);
-  const totalStudyHours = Math.floor(totalStudyMinutes / 60);
+  // Use the improved study hours calculation
+  const totalStudyHours = getTotalStudyHours();
+  const totalStudyMinutes = getTotalStudyMinutes();
+
+  console.log('Dashboard stats:', {
+    totalStudyHours,
+    totalStudyMinutes,
+    enrolledCoursesCount: enrolledCourses.length,
+    streak
+  });
 
   // Calculate completed courses
   const completedCourses = enrolledCourses.filter(course => {

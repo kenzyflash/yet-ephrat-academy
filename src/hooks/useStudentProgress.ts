@@ -43,6 +43,8 @@ export const useStudentProgress = () => {
     if (!user) return;
 
     try {
+      console.log('Fetching study sessions for user:', user.id);
+      
       const { data, error } = await supabase
         .from('study_sessions')
         .select('*')
@@ -50,7 +52,15 @@ export const useStudentProgress = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Fetched study sessions:', data);
       setStudySessions(data || []);
+      
+      // Calculate and log total study time
+      const totalMinutes = (data || []).reduce((sum, session) => sum + (session.minutes_studied || 0), 0);
+      const totalHours = Math.floor(totalMinutes / 60);
+      console.log('Total study time:', totalMinutes, 'minutes =', totalHours, 'hours');
+      
     } catch (error) {
       console.error('Error fetching study sessions:', error);
       setStudySessions([]);
@@ -253,6 +263,38 @@ export const useStudentProgress = () => {
     }
   };
 
+  // Helper function to get total study hours
+  const getTotalStudyHours = () => {
+    const totalMinutes = studySessions.reduce((sum, session) => sum + (session.minutes_studied || 0), 0);
+    return Math.floor(totalMinutes / 60);
+  };
+
+  // Helper function to get total study minutes
+  const getTotalStudyMinutes = () => {
+    return studySessions.reduce((sum, session) => sum + (session.minutes_studied || 0), 0);
+  };
+
+  // Helper function to get weekly study progress
+  const getWeeklyStudyProgress = () => {
+    if (!studySessions.length) return { hours: 0, minutes: 0 };
+
+    const today = new Date();
+    const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+    
+    const thisWeekSessions = studySessions.filter(session => {
+      const sessionDate = new Date(session.date);
+      return sessionDate >= weekStart;
+    });
+
+    const totalMinutes = thisWeekSessions.reduce((sum, session) => sum + (session.minutes_studied || 0), 0);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    console.log('Weekly study progress:', { totalMinutes, hours, minutes, sessionsCount: thisWeekSessions.length });
+    
+    return { hours, minutes };
+  };
+
   const refetchProgress = async () => {
     await fetchStudySessions();
     await fetchCurrentGoals();
@@ -265,6 +307,9 @@ export const useStudentProgress = () => {
     loading,
     logStudySession,
     updateWeeklyGoals,
-    refetchProgress
+    refetchProgress,
+    getTotalStudyHours,
+    getTotalStudyMinutes,
+    getWeeklyStudyProgress
   };
 };
