@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,29 +56,54 @@ const SubmissionManagement = () => {
     try {
       console.log('Fetching submissions for teacher:', user.id);
 
-      // Use the proper foreign key relationships to get all data efficiently
+      // First, get all assignments for courses taught by this instructor
+      const { data: teacherAssignments, error: assignmentsError } = await supabase
+        .from('assignments')
+        .select(`
+          id,
+          title,
+          due_date,
+          course_id,
+          courses!fk_assignments_course_id(
+            id,
+            title,
+            instructor_id
+          )
+        `)
+        .eq('courses.instructor_id', user.id);
+
+      if (assignmentsError) {
+        console.error('Error fetching teacher assignments:', assignmentsError);
+        throw assignmentsError;
+      }
+
+      if (!teacherAssignments || teacherAssignments.length === 0) {
+        console.log('No assignments found for this teacher');
+        setSubmissions([]);
+        if (showRefreshing) {
+          toast({
+            title: "Refreshed",
+            description: "No assignments found",
+          });
+        }
+        return;
+      }
+
+      const assignmentIds = teacherAssignments.map(assignment => assignment.id);
+      console.log('Assignment IDs for teacher:', assignmentIds);
+
+      // Now get all submissions for these assignments with student profiles
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
         .select(`
           *,
-          assignments!fk_assignment_submissions_assignment_id(
-            id,
-            title,
-            due_date,
-            course_id,
-            courses!fk_assignments_course_id(
-              id,
-              title,
-              instructor_id
-            )
-          ),
           profiles!fk_assignment_submissions_user_id(
             id,
             first_name,
             last_name
           )
         `)
-        .eq('assignments.courses.instructor_id', user.id)
+        .in('assignment_id', assignmentIds)
         .order('submitted_at', { ascending: false });
 
       if (submissionsError) {
@@ -87,7 +111,7 @@ const SubmissionManagement = () => {
         throw submissionsError;
       }
 
-      console.log('Submissions data with proper joins:', submissionsData);
+      console.log('Submissions data with profiles:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
@@ -103,7 +127,7 @@ const SubmissionManagement = () => {
 
       // Transform the data to match our interface
       const enrichedSubmissions = submissionsData.map((submission: any) => {
-        const assignment = submission.assignments;
+        const assignment = teacherAssignments.find(a => a.id === submission.assignment_id);
         const course = assignment?.courses;
         const profile = submission.profiles;
         
