@@ -33,8 +33,23 @@ const ThumbnailUploader = ({ onUploadComplete, currentUrl }: ThumbnailUploaderPr
     setProgress(0);
 
     try {
+      // Check if user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('Current user:', user);
+      console.log('Auth error:', authError);
+
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Check if bucket exists
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+      console.log('Available buckets:', buckets);
+      console.log('Buckets error:', bucketsError);
+
       const fileExt = file.name.split('.').pop();
       const filePath = `${Date.now()}-${Math.random()}.${fileExt}`;
+      console.log('Uploading to path:', filePath);
 
       const progressInterval = setInterval(() => {
         setProgress(prev => {
@@ -52,14 +67,19 @@ const ThumbnailUploader = ({ onUploadComplete, currentUrl }: ThumbnailUploaderPr
 
       clearInterval(progressInterval);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Upload error details:', error);
+        throw error;
+      }
 
+      console.log('Upload successful:', data);
       setProgress(100);
 
       const { data: { publicUrl } } = supabase.storage
         .from('course-thumbnails')
         .getPublicUrl(data.path);
 
+      console.log('Public URL:', publicUrl);
       onUploadComplete(publicUrl);
 
       toast({
@@ -68,6 +88,12 @@ const ThumbnailUploader = ({ onUploadComplete, currentUrl }: ThumbnailUploaderPr
       });
     } catch (error: any) {
       console.error('Error uploading thumbnail:', error);
+      console.error('Error details:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        error: error.error
+      });
+      
       toast({
         title: "Upload failed",
         description: error.message || "Failed to upload thumbnail. Please try again.",
