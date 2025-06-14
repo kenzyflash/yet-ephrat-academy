@@ -57,23 +57,53 @@ const SubmissionManagement = () => {
     try {
       console.log('Fetching submissions for teacher:', user.id);
 
-      // Get submissions directly using the RLS policy
+      // First, get all courses taught by this teacher
+      const { data: teacherCourses, error: coursesError } = await supabase
+        .from('courses')
+        .select('id, title')
+        .eq('instructor_id', user.id);
+
+      if (coursesError) {
+        console.error('Error fetching teacher courses:', coursesError);
+        throw coursesError;
+      }
+
+      console.log('Teacher courses:', teacherCourses);
+
+      if (!teacherCourses || teacherCourses.length === 0) {
+        console.log('No courses found for teacher');
+        setSubmissions([]);
+        return;
+      }
+
+      const courseIds = teacherCourses.map(course => course.id);
+
+      // Get assignments for these courses
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('assignments')
+        .select('id, title, due_date, course_id')
+        .in('course_id', courseIds);
+
+      if (assignmentsError) {
+        console.error('Error fetching assignments:', assignmentsError);
+        throw assignmentsError;
+      }
+
+      console.log('Assignments:', assignments);
+
+      if (!assignments || assignments.length === 0) {
+        console.log('No assignments found for teacher courses');
+        setSubmissions([]);
+        return;
+      }
+
+      const assignmentIds = assignments.map(assignment => assignment.id);
+
+      // Get submissions for these assignments
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
-        .select(`
-          *,
-          assignments!inner(
-            id,
-            title,
-            due_date,
-            course_id,
-            courses!inner(
-              id,
-              title,
-              instructor_id
-            )
-          )
-        `)
+        .select('*')
+        .in('assignment_id', assignmentIds)
         .order('submitted_at', { ascending: false });
 
       if (submissionsError) {
@@ -81,7 +111,7 @@ const SubmissionManagement = () => {
         throw submissionsError;
       }
 
-      console.log('Raw submissions data:', submissionsData);
+      console.log('Submissions data:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
@@ -103,27 +133,35 @@ const SubmissionManagement = () => {
 
       console.log('Profiles data:', profiles);
 
-      // Create profiles map
+      // Create lookup maps
       const profilesMap = new Map(
         (profiles || []).map(profile => [
           profile.id,
-          `${profile.first_name} ${profile.last_name}`.trim()
+          `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Student'
         ])
+      );
+
+      const assignmentsMap = new Map(
+        assignments.map(assignment => [assignment.id, assignment])
+      );
+
+      const coursesMap = new Map(
+        teacherCourses.map(course => [course.id, course])
       );
 
       // Transform submissions data
       const enrichedSubmissions = submissionsData.map(submission => {
-        const assignment = submission.assignments;
-        const course = assignment?.courses;
+        const assignment = assignmentsMap.get(submission.assignment_id);
+        const course = assignment ? coursesMap.get(assignment.course_id) : null;
         
         return {
           ...submission,
           assignment: {
-            id: assignment.id,
-            title: assignment.title,
-            course_id: assignment.course_id,
+            id: assignment?.id || '',
+            title: assignment?.title || 'Unknown Assignment',
+            course_id: assignment?.course_id || '',
             course_title: course?.title || 'Unknown Course',
-            due_date: assignment.due_date
+            due_date: assignment?.due_date || ''
           },
           student_name: profilesMap.get(submission.user_id) || 'Unknown Student'
         };
