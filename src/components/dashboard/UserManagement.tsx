@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,25 +38,23 @@ const UserManagement = () => {
   const fetchAllUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching users with JOIN query...');
+      console.log('🔍 Fetching all users...');
       
-      const { data: joinedData, error: joinError } = await supabase
+      // First, get all profiles
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles (
-            role
-          )
-        `);
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      if (joinError) {
-        console.error('❌ JOIN query failed:', joinError);
-        throw joinError;
+      if (profilesError) {
+        console.error('❌ Error fetching profiles:', profilesError);
+        throw profilesError;
       }
       
-      console.log('🔗 Joined data:', joinedData);
+      console.log('👥 Profiles found:', profiles?.length || 0);
+      console.log('📋 Profiles data:', profiles);
       
-      if (!joinedData || joinedData.length === 0) {
+      if (!profiles || profiles.length === 0) {
         console.warn('⚠️ No profiles found in database');
         setUsers([]);
         toast({
@@ -68,11 +65,32 @@ const UserManagement = () => {
         return;
       }
 
-      // Process the joined data
-      const processedUsers: User[] = joinedData.map(profile => {
-        const userRole = profile.user_roles?.[0]?.role || 'student';
+      // Get all user roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+      
+      if (rolesError) {
+        console.error('❌ Error fetching user roles:', rolesError);
+        // Continue with default roles if role fetch fails
+      }
+      
+      console.log('🔑 User roles found:', userRoles?.length || 0);
+      console.log('📋 User roles data:', userRoles);
+
+      // Create a map of user roles for quick lookup
+      const roleMap = new Map();
+      if (userRoles) {
+        userRoles.forEach(role => {
+          roleMap.set(role.user_id, role.role);
+        });
+      }
+
+      // Process all profiles and assign roles
+      const processedUsers: User[] = profiles.map(profile => {
+        const userRole = roleMap.get(profile.id) || 'student';
         
-        console.log(`👤 Processing: ${profile.email}`);
+        console.log(`👤 Processing user: ${profile.email}`);
         console.log(`   - ID: ${profile.id}`);
         console.log(`   - Name: ${profile.first_name} ${profile.last_name}`);
         console.log(`   - Role: ${userRole}`);
