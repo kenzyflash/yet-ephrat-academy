@@ -68,7 +68,7 @@ const CertificateGenerator = () => {
         height: certificateRef.current.offsetHeight,
         onclone: (clonedDoc) => {
           // Ensure all styles are applied to the cloned document
-          const clonedElement = clonedDoc.querySelector('[data-certificate]');
+          const clonedElement = clonedDoc.querySelector('[data-certificate]') as HTMLElement;
           if (clonedElement) {
             clonedElement.style.transform = 'none';
             clonedElement.style.position = 'relative';
