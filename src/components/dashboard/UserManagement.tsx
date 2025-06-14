@@ -33,61 +33,69 @@ const UserManagement = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchUsers();
+    fetchAllUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchAllUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Starting comprehensive user fetch...');
+      console.log('🔄 Starting comprehensive user data fetch...');
       
-      // First, get ALL profiles
-      const { data: allProfiles, error: profilesError } = await supabase
+      // Step 1: Fetch ALL profiles from the database
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📊 Raw profiles from database:', allProfiles);
-      console.log('❌ Profiles error (if any):', profilesError);
-
       if (profilesError) {
-        console.error('Database error fetching profiles:', profilesError);
+        console.error('❌ Error fetching profiles:', profilesError);
         throw profilesError;
       }
 
-      if (!allProfiles || allProfiles.length === 0) {
+      console.log(`📊 Total profiles found: ${profilesData?.length || 0}`, profilesData);
+
+      if (!profilesData || profilesData.length === 0) {
         console.warn('⚠️ No profiles found in database');
         setUsers([]);
+        toast({
+          title: "No Users Found",
+          description: "No user profiles were found in the database.",
+          variant: "destructive"
+        });
         return;
       }
 
-      // Then, get ALL user roles
-      const { data: allRoles, error: rolesError } = await supabase
+      // Step 2: Fetch ALL user roles from the database
+      const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
 
-      console.log('🎭 Raw user roles from database:', allRoles);
-      console.log('❌ Roles error (if any):', rolesError);
-
       if (rolesError) {
-        console.warn('Warning fetching roles:', rolesError);
+        console.error('❌ Error fetching user roles:', rolesError);
+        // Don't throw here, just log the error and continue with default roles
       }
 
-      // Create role mapping
-      const roleMap = new Map<string, string>();
-      if (allRoles && allRoles.length > 0) {
-        allRoles.forEach(roleEntry => {
-          roleMap.set(roleEntry.user_id, roleEntry.role);
-          console.log(`🔗 Role mapping: ${roleEntry.user_id} -> ${roleEntry.role}`);
+      console.log(`🎭 Total roles found: ${rolesData?.length || 0}`, rolesData);
+
+      // Step 3: Create a comprehensive role mapping
+      const roleMapping = new Map<string, string>();
+      
+      if (rolesData && rolesData.length > 0) {
+        rolesData.forEach(roleEntry => {
+          roleMapping.set(roleEntry.user_id, roleEntry.role);
+          console.log(`🔗 Mapped role: ${roleEntry.user_id} -> ${roleEntry.role}`);
         });
       }
 
-      console.log('🗺️ Complete role map:', Object.fromEntries(roleMap));
-
-      // Map each profile to a user with role
-      const completeUsersList: User[] = allProfiles.map(profile => {
-        const assignedRole = roleMap.get(profile.id) || 'student';
-        console.log(`👤 Processing user: ${profile.email} (${profile.id}) -> role: ${assignedRole}`);
+      // Step 4: Process each profile and assign roles
+      const processedUsers: User[] = profilesData.map(profile => {
+        const assignedRole = roleMapping.get(profile.id) || 'student';
+        
+        console.log(`👤 Processing user: ${profile.email} (ID: ${profile.id})`);
+        console.log(`   - Name: ${profile.first_name} ${profile.last_name}`);
+        console.log(`   - Role: ${assignedRole}`);
+        console.log(`   - School: ${profile.school || 'N/A'}`);
+        console.log(`   - Grade: ${profile.grade || 'N/A'}`);
         
         return {
           id: profile.id,
@@ -101,18 +109,21 @@ const UserManagement = () => {
         };
       });
 
-      console.log(`✅ Complete users list (${completeUsersList.length} users):`, completeUsersList);
+      console.log(`✅ Successfully processed ${processedUsers.length} users:`, processedUsers);
 
-      // Set the users state
-      setUsers(completeUsersList);
+      // Step 5: Update state with all users
+      setUsers(processedUsers);
       
-      console.log('🎯 State updated with users:', completeUsersList.length);
+      toast({
+        title: "Users Loaded",
+        description: `Successfully loaded ${processedUsers.length} users from the database.`,
+      });
       
     } catch (error) {
-      console.error('💥 Critical error in fetchUsers:', error);
+      console.error('💥 Critical error in fetchAllUsers:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch users. Check console for details.",
+        title: "Error Loading Users",
+        description: "Failed to load users from the database. Check console for details.",
         variant: "destructive"
       });
       setUsers([]);
@@ -129,8 +140,6 @@ const UserManagement = () => {
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
-
-  console.log(`🔍 Filtered users for display: ${filteredUsers.length}`, filteredUsers);
 
   const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
@@ -245,7 +254,7 @@ const UserManagement = () => {
         <CardContent className="p-6">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-            <p>Loading users...</p>
+            <p>Loading all users from database...</p>
           </div>
         </CardContent>
       </Card>
@@ -271,18 +280,10 @@ const UserManagement = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Active Users</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-sm text-gray-600">Admins</p>
+                <p className="text-2xl font-bold">{stats.byRole.admin || 0}</p>
               </div>
-              <UserCheck className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div>
-              <p className="text-sm text-gray-600">Students</p>
-              <p className="text-2xl font-bold">{stats.byRole.student || 0}</p>
+              <UserCheck className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -291,6 +292,14 @@ const UserManagement = () => {
             <div>
               <p className="text-sm text-gray-600">Teachers</p>
               <p className="text-2xl font-bold">{stats.byRole.teacher || 0}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-4">
+            <div>
+              <p className="text-sm text-gray-600">Students</p>
+              <p className="text-2xl font-bold">{stats.byRole.student || 0}</p>
             </div>
           </CardContent>
         </Card>
@@ -305,16 +314,16 @@ const UserManagement = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchUsers}
+              onClick={fetchAllUsers}
               className="ml-auto"
               disabled={loading}
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+              Refresh All Users
             </Button>
           </CardTitle>
           <CardDescription>
-            Manage user accounts and permissions ({filteredUsers.length} of {users.length} users shown)
+            Manage all user accounts and permissions - Showing {filteredUsers.length} of {users.length} users
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -344,10 +353,10 @@ const UserManagement = () => {
             </Select>
           </div>
 
-          {/* Debug Info */}
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-            <p><strong>Debug:</strong> Found {users.length} total users, showing {filteredUsers.length} after filters</p>
-            <p><strong>Search:</strong> "{searchTerm}" | <strong>Role Filter:</strong> "{roleFilter}"</p>
+          {/* Database Status */}
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+            <p><strong>Database Status:</strong> Successfully loaded {users.length} users from profiles table</p>
+            <p><strong>Filter Status:</strong> Displaying {filteredUsers.length} users (Search: "{searchTerm}", Role: "{roleFilter}")</p>
           </div>
 
           {/* Users Table */}
@@ -357,8 +366,8 @@ const UserManagement = () => {
               <p className="text-sm font-medium mb-1">No users found</p>
               <p className="text-xs">
                 {users.length === 0 
-                  ? "No users in database. Check console logs for errors." 
-                  : "Try adjusting your search or filter criteria, or click Refresh to reload users."
+                  ? "No users found in database. Please check your database connection." 
+                  : "Try adjusting your search or filter criteria."
                 }
               </p>
             </div>
