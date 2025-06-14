@@ -37,53 +37,58 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Starting to fetch all users...');
+      console.log('🔍 Starting to fetch all users and roles...');
       
-      // First, let's get ALL profiles without any filters
-      const { data: allProfiles, error: profilesError } = await supabase
+      // Get ALL profiles from the database
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
+      console.log('📊 Profiles query result:', { profiles, error: profilesError });
+
       if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
+        console.error('❌ Error fetching profiles:', profilesError);
         throw profilesError;
       }
 
-      console.log('Raw profiles fetched:', allProfiles?.length || 0, allProfiles);
-
-      if (!allProfiles || allProfiles.length === 0) {
-        console.warn('No profiles found in database');
+      if (!profiles || profiles.length === 0) {
+        console.warn('⚠️ No profiles found in database');
         setUsers([]);
         return;
       }
 
-      // Get ALL user roles without any filters
-      const { data: allUserRoles, error: rolesError } = await supabase
+      console.log(`✅ Found ${profiles.length} profiles:`, profiles);
+
+      // Get ALL user roles from the database
+      const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
 
+      console.log('🎭 User roles query result:', { userRoles, error: rolesError });
+
       if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-        // Continue with empty roles rather than failing completely
+        console.error('❌ Error fetching user roles:', rolesError);
+        // Don't throw here, continue with empty roles
       }
 
-      console.log('Raw user roles fetched:', allUserRoles?.length || 0, allUserRoles);
+      console.log(`✅ Found ${userRoles?.length || 0} user roles:`, userRoles);
 
-      // Create a map of user roles for efficient lookup
+      // Create a map for quick role lookup
       const roleMap = new Map<string, string>();
-      if (allUserRoles) {
-        allUserRoles.forEach(roleEntry => {
+      if (userRoles && userRoles.length > 0) {
+        userRoles.forEach(roleEntry => {
           roleMap.set(roleEntry.user_id, roleEntry.role);
+          console.log(`👤 User ${roleEntry.user_id} has role: ${roleEntry.role}`);
         });
       }
 
-      console.log('Role map created:', Array.from(roleMap.entries()));
+      console.log('🗺️ Role map created with entries:', roleMap.size);
 
-      // Combine profiles with roles, ensuring every user has a role
-      const usersWithRoles: User[] = allProfiles.map(profile => {
+      // Combine profiles with their roles
+      const usersWithRoles: User[] = profiles.map(profile => {
         const userRole = roleMap.get(profile.id) || 'student';
-        console.log(`User ${profile.email} has role: ${userRole}`);
+        console.log(`🔗 Mapping user ${profile.email} (${profile.id}) with role: ${userRole}`);
         
         return {
           id: profile.id,
@@ -97,40 +102,42 @@ const UserManagement = () => {
         };
       });
 
-      console.log('Final users with roles:', usersWithRoles.length, usersWithRoles);
+      console.log(`🎯 Final users array with ${usersWithRoles.length} users:`, usersWithRoles);
 
-      // For users without roles in user_roles table, create the default role entry
-      const usersNeedingRoles = usersWithRoles.filter(user => !roleMap.has(user.id));
+      // Create default roles for users who don't have any
+      const usersWithoutRoles = usersWithRoles.filter(user => !roleMap.has(user.id));
       
-      if (usersNeedingRoles.length > 0) {
-        console.log('Creating default student roles for users:', usersNeedingRoles.map(u => u.email));
+      if (usersWithoutRoles.length > 0) {
+        console.log(`🆕 Creating default roles for ${usersWithoutRoles.length} users:`, 
+          usersWithoutRoles.map(u => u.email));
         
-        const roleInserts = usersNeedingRoles.map(user => ({
+        const defaultRoleInserts = usersWithoutRoles.map(user => ({
           user_id: user.id,
           role: 'student' as const
         }));
 
         const { error: insertError } = await supabase
           .from('user_roles')
-          .insert(roleInserts);
+          .insert(defaultRoleInserts);
 
         if (insertError) {
-          console.warn('Could not insert default roles:', insertError);
+          console.warn('⚠️ Could not insert default roles:', insertError);
         } else {
-          console.log('Successfully created default student roles');
+          console.log('✅ Successfully created default student roles');
         }
       }
 
       setUsers(usersWithRoles);
-      console.log('Users state updated with', usersWithRoles.length, 'users');
+      console.log(`🎉 Successfully loaded ${usersWithRoles.length} users into state`);
       
     } catch (error) {
-      console.error('Critical error in fetchUsers:', error);
+      console.error('💥 Critical error in fetchUsers:', error);
       toast({
         title: "Error",
         description: "Failed to fetch users. Please check the console for details.",
         variant: "destructive"
       });
+      setUsers([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -148,7 +155,7 @@ const UserManagement = () => {
   const handleUpdateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
     try {
       setUpdatingRole(userId);
-      console.log(`Updating user ${userId} role to ${newRole}`);
+      console.log(`🔄 Updating user ${userId} role to ${newRole}`);
       
       // First, delete any existing role for this user
       const { error: deleteError } = await supabase
@@ -157,7 +164,7 @@ const UserManagement = () => {
         .eq('user_id', userId);
 
       if (deleteError) {
-        console.error('Error deleting existing role:', deleteError);
+        console.error('❌ Error deleting existing role:', deleteError);
       }
 
       // Then insert the new role
@@ -169,7 +176,7 @@ const UserManagement = () => {
         });
 
       if (insertError) {
-        console.error('Error inserting new role:', insertError);
+        console.error('❌ Error inserting new role:', insertError);
         throw insertError;
       }
 
@@ -178,13 +185,13 @@ const UserManagement = () => {
         user.id === userId ? { ...user, role: newRole } : user
       ));
       
-      console.log(`Successfully updated user ${userId} role to ${newRole}`);
+      console.log(`✅ Successfully updated user ${userId} role to ${newRole}`);
       toast({
         title: "Success",
         description: `User role has been updated to ${newRole}.`,
       });
     } catch (error) {
-      console.error('Error updating user role:', error);
+      console.error('💥 Error updating user role:', error);
       toast({
         title: "Error",
         description: "Failed to update user role. Please try again.",
@@ -328,7 +335,7 @@ const UserManagement = () => {
             </Button>
           </CardTitle>
           <CardDescription>
-            Manage user accounts and permissions ({filteredUsers.length} of {users.length} users)
+            Manage user accounts and permissions ({filteredUsers.length} of {users.length} users shown)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -358,13 +365,29 @@ const UserManagement = () => {
             </Select>
           </div>
 
-          {/* Debug Info */}
-          <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
-            <p><strong>Debug Info:</strong></p>
-            <p>Total users in state: {users.length}</p>
-            <p>Filtered users: {filteredUsers.length}</p>
-            <p>Current filter: {roleFilter}</p>
-            <p>Search term: "{searchTerm}"</p>
+          {/* Debug Info - Enhanced */}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="font-semibold text-blue-800 mb-2">Database Status:</p>
+                <p>📊 Total users loaded: <span className="font-medium">{users.length}</span></p>
+                <p>🔍 Filtered users shown: <span className="font-medium">{filteredUsers.length}</span></p>
+                <p>🎭 Current role filter: <span className="font-medium">"{roleFilter}"</span></p>
+                <p>🔎 Search term: <span className="font-medium">"{searchTerm}"</span></p>
+              </div>
+              <div>
+                <p className="font-semibold text-blue-800 mb-2">Role Distribution:</p>
+                <p>👑 Admins: <span className="font-medium">{stats.byRole.admin || 0}</span></p>
+                <p>🎓 Teachers: <span className="font-medium">{stats.byRole.teacher || 0}</span></p>
+                <p>📚 Students: <span className="font-medium">{stats.byRole.student || 0}</span></p>
+              </div>
+            </div>
+            <div className="mt-3 p-2 bg-white rounded border">
+              <p className="text-xs text-gray-600">
+                💡 <strong>Tip:</strong> Check your browser console for detailed logs if users are missing.
+                Try clicking the "Refresh" button to reload all users from the database.
+              </p>
+            </div>
           </div>
 
           {/* Users List */}
@@ -375,8 +398,8 @@ const UserManagement = () => {
                 <p className="text-sm font-medium mb-1">No users found</p>
                 <p className="text-xs">
                   {users.length === 0 
-                    ? "No users in database" 
-                    : "Try adjusting your search or filter criteria"
+                    ? "No users in database. Check console logs for errors." 
+                    : "Try adjusting your search or filter criteria, or click Refresh to reload users."
                   }
                 </p>
               </div>
