@@ -1,3 +1,4 @@
+
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -57,6 +58,7 @@ const StudentDashboard = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isGoalsDialogOpen, setIsGoalsDialogOpen] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [tempGoals, setTempGoals] = useState({
     study_hours_goal: 15,
     lessons_goal: 10,
@@ -76,6 +78,29 @@ const StudentDashboard = () => {
     getWeeklyStudyProgress
   } = useStudentProgress();
   const { courseProgress, getCourseProgress } = useCourseProgress();
+
+  // Handle page visibility to prevent loading issues when switching tabs
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user && !dataLoaded) {
+        console.log('Tab became visible, refreshing data...');
+        fetchUserProfile();
+        if (enrollments.length > 0) {
+          fetchAssignments();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, dataLoaded, enrollments.length]);
+
+  // Set data loaded state when initial data is ready
+  useEffect(() => {
+    if (user && !coursesLoading && courses.length >= 0 && enrollments.length >= 0) {
+      setDataLoaded(true);
+    }
+  }, [user, coursesLoading, courses, enrollments]);
 
   // Debug logging to see what data we have
   useEffect(() => {
@@ -249,8 +274,11 @@ const StudentDashboard = () => {
     }
   };
 
-  // Show loading while checking authentication
-  if (loading || coursesLoading) {
+  // Improved loading logic - only show loading when actually needed
+  const isActuallyLoading = loading || (coursesLoading && !dataLoaded);
+
+  // Show loading while checking authentication or initial data load
+  if (isActuallyLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
