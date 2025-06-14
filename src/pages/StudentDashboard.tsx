@@ -1,4 +1,3 @@
-
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,14 +22,12 @@ import {
   TrendingUp,
   MessageSquare,
   Users,
-  Award,
   Settings
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import ProfileDropdown from "@/components/ProfileDropdown";
 import CourseEnrollment from "@/components/dashboard/CourseEnrollment";
-import CertificateGenerator from "@/components/dashboard/CertificateGenerator";
 import { useCourseData } from "@/hooks/useCourseData";
 import { useStudentProgress } from "@/hooks/useStudentProgress";
 import { useCourseProgress } from "@/hooks/useCourseProgress";
@@ -317,7 +314,7 @@ const StudentDashboard = () => {
   const stats = [
     { label: "Courses Enrolled", value: enrolledCourses.length.toString(), icon: BookOpen, color: "text-blue-600" },
     { label: "Hours Studied", value: totalStudyHours.toString(), icon: Clock, color: "text-green-600" },
-    { label: "Certificates Earned", value: completedCourses.length.toString(), icon: Award, color: "text-purple-600" },
+    { label: "Courses Completed", value: completedCourses.length.toString(), icon: Trophy, color: "text-purple-600" },
     { label: "Current Streak", value: `${streak} days`, icon: TrendingUp, color: "text-orange-600" }
   ];
 
@@ -372,11 +369,10 @@ const StudentDashboard = () => {
 
           {/* Main Content with Tabs */}
           <Tabs defaultValue="dashboard" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
               <TabsTrigger value="courses">Browse Courses</TabsTrigger>
               <TabsTrigger value="achievements">Achievements</TabsTrigger>
-              <TabsTrigger value="certificates">Certificates</TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
@@ -627,10 +623,6 @@ const StudentDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="certificates">
-              <CertificateGenerator />
             </TabsContent>
           </Tabs>
         </div>
