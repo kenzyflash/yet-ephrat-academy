@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,9 +27,17 @@ export const useStudentProgress = () => {
     if (user) {
       fetchStudySessions();
       fetchCurrentGoals();
-      calculateStreak();
     }
   }, [user]);
+
+  // Calculate streak whenever study sessions change
+  useEffect(() => {
+    if (studySessions.length > 0) {
+      calculateStreak();
+    } else {
+      setStreak(0);
+    }
+  }, [studySessions]);
 
   const fetchStudySessions = async () => {
     if (!user) return;
@@ -44,6 +53,7 @@ export const useStudentProgress = () => {
       setStudySessions(data || []);
     } catch (error) {
       console.error('Error fetching study sessions:', error);
+      setStudySessions([]);
     }
   };
 
@@ -118,50 +128,72 @@ export const useStudentProgress = () => {
     }
   };
 
-  const calculateStreak = async () => {
-    if (!user) return;
-
+  const calculateStreak = () => {
     try {
-      const sessions = studySessions;
-      if (sessions.length === 0) {
+      console.log('Calculating streak with sessions:', studySessions.length);
+      
+      if (studySessions.length === 0) {
+        console.log('No study sessions found, streak = 0');
         setStreak(0);
         return;
       }
 
-      // Sort sessions by date
-      const sortedSessions = sessions.sort((a, b) => 
+      // Sort sessions by date (most recent first)
+      const sortedSessions = [...studySessions].sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
 
-      let currentStreak = 0;
-      const today = new Date();
-      const todayString = today.toISOString().split('T')[0];
-      
-      // Check if there's a session today or yesterday
-      const latestSession = sortedSessions[0];
-      const latestDate = new Date(latestSession.date);
-      const daysDiff = Math.floor((today.getTime() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysDiff > 1) {
+      console.log('Sorted sessions:', sortedSessions.map(s => s.date));
+
+      // Get unique dates (in case there are multiple sessions per day)
+      const uniqueDates = [...new Set(sortedSessions.map(session => session.date))];
+      console.log('Unique study dates:', uniqueDates);
+
+      if (uniqueDates.length === 0) {
         setStreak(0);
         return;
       }
 
-      // Count consecutive days
-      let checkDate = new Date(latestSession.date);
-      for (const session of sortedSessions) {
-        const sessionDate = new Date(session.date);
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayString = yesterday.toISOString().split('T')[0];
+
+      console.log('Today:', todayString, 'Yesterday:', yesterdayString);
+      console.log('Most recent study date:', uniqueDates[0]);
+
+      // Check if the most recent session is today or yesterday
+      const mostRecentDate = uniqueDates[0];
+      if (mostRecentDate !== todayString && mostRecentDate !== yesterdayString) {
+        console.log('Most recent session is too old, streak broken');
+        setStreak(0);
+        return;
+      }
+
+      // Count consecutive days starting from the most recent
+      let currentStreak = 0;
+      let checkDate = new Date(mostRecentDate);
+      
+      for (const dateString of uniqueDates) {
+        const sessionDate = new Date(dateString);
         const expectedDateString = checkDate.toISOString().split('T')[0];
-        const sessionDateString = sessionDate.toISOString().split('T')[0];
         
-        if (sessionDateString === expectedDateString) {
+        console.log('Checking date:', dateString, 'Expected:', expectedDateString);
+        
+        if (dateString === expectedDateString) {
           currentStreak++;
+          console.log('Streak continues, current:', currentStreak);
+          // Move to previous day
           checkDate.setDate(checkDate.getDate() - 1);
         } else {
+          // Gap found, break the streak
+          console.log('Gap found, breaking streak');
           break;
         }
       }
 
+      console.log('Final calculated streak:', currentStreak);
       setStreak(currentStreak);
     } catch (error) {
       console.error('Error calculating streak:', error);
@@ -175,6 +207,8 @@ export const useStudentProgress = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
+      console.log('Logging study session:', minutes, 'minutes for date:', today);
+      
       const { error } = await supabase.rpc('increment_study_minutes', {
         p_user_id: user.id,
         p_date: today,
@@ -183,8 +217,10 @@ export const useStudentProgress = () => {
 
       if (error) throw error;
 
+      console.log('Study session logged successfully');
+      
+      // Refresh data after logging
       await fetchStudySessions();
-      await calculateStreak();
     } catch (error) {
       console.error('Error logging study session:', error);
     }
@@ -220,7 +256,6 @@ export const useStudentProgress = () => {
   const refetchProgress = async () => {
     await fetchStudySessions();
     await fetchCurrentGoals();
-    await calculateStreak();
   };
 
   return {
