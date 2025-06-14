@@ -24,28 +24,27 @@ interface RecentActivity {
   type: 'discussion' | 'enrollment' | 'submission';
 }
 
+interface TeacherStats {
+  totalStudents: number;
+  averageRating: number;
+  totalLessons: number;
+}
+
 const TeacherDashboard = () => {
   const { user, userRole } = useAuth();
   const { courses, loading: coursesLoading } = useCourseData();
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  const [teacherStats, setTeacherStats] = useState<TeacherStats>({
+    totalStudents: 0,
+    averageRating: 0,
+    totalLessons: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Filter courses to show only those created by the current user
   const userCourses = courses.filter(course => course.instructor_id === user?.id);
-
-  // Calculate stats from real data
-  const totalStudents = userCourses.reduce((sum, course) => sum + (course.student_count || 0), 0);
-  const averageRating = userCourses.length > 0 
-    ? (userCourses.reduce((sum, course) => sum + (course.rating || 0), 0) / userCourses.length * 100 / 5).toFixed(0)
-    : 0;
-
-  const teacherStats = [
-    { label: "My Courses", value: userCourses.length.toString(), icon: BookOpen, color: "text-blue-600" },
-    { label: "Total Students", value: totalStudents.toLocaleString(), icon: Users, color: "text-green-600" },
-    { label: "Avg. Rating", value: `${averageRating}%`, icon: BarChart3, color: "text-purple-600" },
-    { label: "Total Lessons", value: userCourses.reduce((sum, course) => sum + (course.total_lessons || 0), 0).toString(), icon: TrendingUp, color: "text-orange-600" }
-  ];
 
   // Set initial load flag when courses are loaded for the first time
   useEffect(() => {
@@ -53,10 +52,78 @@ const TeacherDashboard = () => {
       setHasInitiallyLoaded(true);
       if (user && userCourses.length > 0) {
         fetchRecentActivities();
+        fetchTeacherStats();
       }
     }
   }, [coursesLoading, hasInitiallyLoaded, user, userCourses.length]);
 
+  const fetchTeacherStats = async () => {
+    if (!user || userCourses.length === 0) {
+      setTeacherStats({
+        totalStudents: 0,
+        averageRating: 0,
+        totalLessons: 0
+      });
+      return;
+    }
+
+    setStatsLoading(true);
+    try {
+      const courseIds = userCourses.map(course => course.id);
+
+      // Fetch total students (enrollments)
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('course_enrollments')
+        .select('id')
+        .in('course_id', courseIds);
+
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments:', enrollmentsError);
+      }
+
+      // Fetch total lessons
+      const { data: lessons, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('id')
+        .in('course_id', courseIds);
+
+      if (lessonsError) {
+        console.error('Error fetching lessons:', lessonsError);
+      }
+
+      // Calculate average rating from courses
+      const coursesWithRatings = userCourses.filter(course => course.rating && course.rating > 0);
+      const averageRating = coursesWithRatings.length > 0
+        ? coursesWithRatings.reduce((sum, course) => sum + (course.rating || 0), 0) / coursesWithRatings.length
+        : 0;
+
+      setTeacherStats({
+        totalStudents: enrollments?.length || 0,
+        averageRating: averageRating,
+        totalLessons: lessons?.length || 0
+      });
+
+    } catch (error) {
+      console.error('Error fetching teacher stats:', error);
+      setTeacherStats({
+        totalStudents: 0,
+        averageRating: 0,
+        totalLessons: 0
+      });
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Create stats array with real data
+  const statsArray = [
+    { label: "My Courses", value: userCourses.length.toString(), icon: BookOpen, color: "text-blue-600" },
+    { label: "Total Students", value: teacherStats.totalStudents.toString(), icon: Users, color: "text-green-600" },
+    { label: "Avg. Rating", value: teacherStats.averageRating > 0 ? `${teacherStats.averageRating.toFixed(1)}/5` : "No ratings", icon: BarChart3, color: "text-purple-600" },
+    { label: "Total Lessons", value: teacherStats.totalLessons.toString(), icon: TrendingUp, color: "text-orange-600" }
+  ];
+
+  // Fetch recent activities
   const fetchRecentActivities = async () => {
     if (!user || userCourses.length === 0) {
       setRecentActivities([]);
@@ -161,6 +228,7 @@ const TeacherDashboard = () => {
     }
   };
 
+  // Get activity icon based on type
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'discussion':
@@ -174,6 +242,7 @@ const TeacherDashboard = () => {
     }
   };
 
+  // Get activity color based on type
   const getActivityColor = (type: string) => {
     switch (type) {
       case 'discussion':
@@ -212,7 +281,7 @@ const TeacherDashboard = () => {
             <p className="text-gray-600">Manage your courses and connect with your students.</p>
           </div>
 
-          <DashboardStats stats={teacherStats} />
+          <DashboardStats stats={statsArray} />
 
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
