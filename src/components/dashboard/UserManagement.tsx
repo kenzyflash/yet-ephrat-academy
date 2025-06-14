@@ -172,34 +172,48 @@ const UserManagement = () => {
     }
   };
 
-  // Alternative fetch method using JOIN approach
+  // Alternative fetch method using direct query approach
   const alternativeFetch = async () => {
     try {
-      console.log('🔄 Trying alternative fetch method with JOIN...');
+      console.log('🔄 Trying alternative fetch method with direct queries...');
       
-      // Try with LEFT JOIN
-      const { data: joinedData, error: joinError } = await supabase
+      // Fetch all profiles first
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles (
-            role
-          )
-        `);
+        .select('*');
       
-      if (joinError) {
-        console.error('❌ JOIN query failed:', joinError);
-        throw joinError;
+      if (profilesError) {
+        console.error('❌ Profiles query failed:', profilesError);
+        throw profilesError;
       }
       
-      console.log('🔗 Joined data:', joinedData);
+      console.log('📊 Profiles fetched:', profilesData?.length || 0);
       
-      const processedUsers = (joinedData as ProfileWithRoles[])?.map(profile => ({
+      // Fetch all roles separately
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      if (rolesError) {
+        console.error('❌ Roles query failed:', rolesError);
+        // Don't throw error, just use default roles
+      }
+      
+      console.log('🎭 Roles fetched:', rolesData?.length || 0);
+      
+      // Create a map of user roles
+      const userRoleMap = new Map<string, string>();
+      rolesData?.forEach(roleEntry => {
+        userRoleMap.set(roleEntry.user_id, roleEntry.role);
+      });
+      
+      // Combine the data
+      const processedUsers = profilesData?.map(profile => ({
         id: profile.id,
         first_name: profile.first_name || 'Unknown',
         last_name: profile.last_name || 'User',
         email: profile.email || 'No email',
-        role: (profile.user_roles?.[0]?.role || 'student') as 'student' | 'teacher' | 'admin',
+        role: (userRoleMap.get(profile.id) || 'student') as 'student' | 'teacher' | 'admin',
         created_at: profile.created_at,
         school: profile.school,
         grade: profile.grade
@@ -207,9 +221,10 @@ const UserManagement = () => {
       
       setUsers(processedUsers);
       setDebugInfo({
-        profileCount: joinedData?.length || 0,
+        profileCount: profilesData?.length || 0,
+        rolesCount: rolesData?.length || 0,
         processedCount: processedUsers.length,
-        strategy: 'join_fetch',
+        strategy: 'direct_queries',
         timestamp: new Date().toISOString()
       });
       
@@ -217,7 +232,7 @@ const UserManagement = () => {
       
       toast({
         title: "Alternative Fetch Successful",
-        description: `Loaded ${processedUsers.length} users using JOIN method.`,
+        description: `Loaded ${processedUsers.length} users using direct queries method.`,
       });
     } catch (error) {
       console.error('❌ Alternative fetch failed:', error);
