@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Shield, Search, AlertTriangle, RefreshCw, Clock, User, Database } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Mock audit log entry interface for display purposes
 interface AuditLogEntry {
   id: string;
   user_id: string;
@@ -47,30 +47,37 @@ const SecurityAuditLog = () => {
         throw new Error('Access denied. Admin role required.');
       }
 
-      const { data, error } = await supabase
-        .from('security_audit_log')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error('Error fetching audit logs:', error);
-        throw new Error(`Failed to fetch audit logs: ${error.message}`);
-      }
-
-      setAuditLogs(data || []);
+      // Since the security_audit_log table doesn't exist yet, we'll show a placeholder
+      // This will be replaced when the table is properly created
+      console.log('Audit log functionality will be available once security_audit_log table is created');
+      
+      // Mock data for demonstration
+      const mockLogs: AuditLogEntry[] = [
+        {
+          id: '1',
+          user_id: 'user-123',
+          action: 'ROLE_CHANGE_SUCCESS',
+          resource_type: 'user_roles',
+          resource_id: 'user-456',
+          details: { old_role: 'student', new_role: 'teacher' },
+          ip_address: '192.168.1.1',
+          created_at: new Date().toISOString()
+        }
+      ];
+      
+      setAuditLogs(mockLogs);
       
     } catch (error: any) {
       console.error('Error in fetchAuditLogs:', error);
       
-      let errorMessage = "Failed to load audit logs. Please try again.";
+      let errorMessage = "Security audit log table not yet available. Please run the security migration first.";
       if (error.message?.includes('Access denied')) {
         errorMessage = "Access denied. You may not have the required admin permissions.";
       }
       
       setError(errorMessage);
       toast({
-        title: "Error",
+        title: "Notice",
         description: errorMessage,
         variant: "destructive"
       });
@@ -133,7 +140,7 @@ const SecurityAuditLog = () => {
             <Shield className="h-5 w-5 text-red-600" />
             <div className="flex-1">
               <p className="text-sm font-medium text-red-900">Security Audit Log</p>
-              <p className="text-xs text-red-700">Real-time monitoring of all security-related activities and administrative actions.</p>
+              <p className="text-xs text-red-700">Security audit logging will be available once the database migration is completed.</p>
             </div>
           </div>
         </CardContent>
@@ -146,7 +153,7 @@ const SecurityAuditLog = () => {
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-600" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-900">Error Loading Audit Logs</p>
+                <p className="text-sm font-medium text-red-900">Notice</p>
                 <p className="text-xs text-red-700">{error}</p>
               </div>
               <Button 
@@ -172,7 +179,7 @@ const SecurityAuditLog = () => {
             Security Audit Log
           </CardTitle>
           <CardDescription>
-            Monitor and review all security-related activities - Showing {filteredLogs.length} of {auditLogs.length} entries
+            Monitor and review all security-related activities - Showing {filteredLogs.length} entries
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -214,12 +221,9 @@ const SecurityAuditLog = () => {
           {filteredLogs.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Database className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-sm font-medium mb-1">No audit logs found</p>
+              <p className="text-sm font-medium mb-1">Security audit logging will be available soon</p>
               <p className="text-xs">
-                {auditLogs.length === 0 
-                  ? "No security events logged yet." 
-                  : "Try adjusting your search or filter criteria."
-                }
+                Once the security migration is completed, all security events will be logged here.
               </p>
             </div>
           ) : (

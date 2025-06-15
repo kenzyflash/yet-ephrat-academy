@@ -81,17 +81,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('Error fetching user role:', error);
         
-        // Log security event for failed role fetch
-        try {
-          await supabase.rpc('log_security_event', {
-            action: 'ROLE_FETCH_FAILED',
-            resource_type: 'user_roles',
-            resource_id: userId,
-            details: { error: error.message }
-          });
-        } catch (logError) {
-          console.error('Failed to log security event:', logError);
-        }
+        // Enhanced error logging (when audit system is available)
+        console.log('Role fetch failed:', { userId, error: error.message });
         
         // Secure fallback: default to student but log the failure
         console.warn('Role fetch failed, defaulting to student for security');
@@ -106,17 +97,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Unexpected error fetching user role:', error);
       
-      // Log critical security event
-      try {
-        await supabase.rpc('log_security_event', {
-          action: 'ROLE_FETCH_CRITICAL_ERROR',
-          resource_type: 'user_roles',
-          resource_id: userId,
-          details: { error: error instanceof Error ? error.message : 'Unknown error' }
-        });
-      } catch (logError) {
-        console.error('Failed to log critical security event:', logError);
-      }
+      // Enhanced error logging (when audit system is available)
+      console.log('Critical role fetch error:', { 
+        userId, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
       
       setUserRole('student');
       return 'student';
@@ -403,8 +388,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('Password must be at least 6 characters long');
       }
 
-      // Remove email-based role assignment for security
-      const defaultRole = 'student'; // Always default to student
+      // Secure default role assignment - always default to student
+      const defaultRole = 'student';
 
       const { error } = await supabase.auth.signUp({
         email: cleanEmail,

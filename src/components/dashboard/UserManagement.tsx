@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -248,16 +247,15 @@ const UserManagement = () => {
         throw new Error('Only administrators can update user roles');
       }
 
-      // Use the new secure function
+      // Use the existing update_user_role function
       const { data, error } = await supabase
-        .rpc('secure_update_user_role', {
+        .rpc('update_user_role', {
           target_user_id: userId,
-          new_role: newRole,
-          reason: 'Admin role change via user management interface'
+          new_role: newRole
         });
 
       if (error) {
-        console.error('Secure role update error:', error);
+        console.error('Role update error:', error);
         throw new Error(`Failed to update role: ${error.message}`);
       }
 
@@ -288,7 +286,7 @@ const UserManagement = () => {
       }, 2000);
       
     } catch (error: any) {
-      console.error('Error in secure role update:', error);
+      console.error('Error in role update:', error);
       
       if (!componentMounted.current) return;
       
