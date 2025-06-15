@@ -168,8 +168,8 @@ const UserManagement = () => {
         throw new Error(`Failed to update role: ${error.message}`);
       }
 
-      // Type guard and parse the response
-      const response = data as RoleUpdateResponse;
+      // Type guard and safe type conversion
+      const response = data as unknown as RoleUpdateResponse;
       
       if (!response.success) {
         throw new Error(response.error || 'Failed to update role');
