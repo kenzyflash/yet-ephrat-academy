@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,23 +41,30 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
-    if (user && userRole === 'admin') {
+    if (user && userRole === 'admin' && !dataLoaded) {
       initializeAdminData();
+    } else if (user && userRole === 'admin' && dataLoaded) {
+      setLoading(false);
     }
-  }, [user, userRole]);
+  }, [user, userRole, dataLoaded]);
 
   const initializeAdminData = async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Starting admin data initialization...');
       
       await Promise.all([
         fetchSystemStats(),
         fetchRecentActions(),
         fetchSystemOverview()
       ]);
+      
+      setDataLoaded(true);
+      console.log('Admin data initialization completed successfully');
     } catch (error) {
       console.error('Error initializing admin data:', error);
       setError('Failed to load admin dashboard data');
@@ -324,6 +330,11 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleRetry = () => {
+    setDataLoaded(false);
+    initializeAdminData();
+  };
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="admin">
@@ -360,7 +371,7 @@ const AdminDashboard = () => {
                   variant="outline" 
                   size="sm" 
                   className="ml-2"
-                  onClick={initializeAdminData}
+                  onClick={handleRetry}
                 >
                   Retry
                 </Button>
