@@ -7,7 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
-import RoleDebugger from "@/components/auth/RoleDebugger";
 import Footer from "@/components/Footer";
 
 const Index = () => {
@@ -342,13 +341,6 @@ const Index = () => {
           </div>
         </div>
       </section>
-
-      {/* Add Role Debugger for logged in users */}
-      {user && (
-        <section className="container mx-auto px-4 py-10">
-          <RoleDebugger />
-        </section>
-      )}
 
       <LoginModal 
         open={showLogin} 

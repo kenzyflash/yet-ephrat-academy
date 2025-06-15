@@ -1,223 +1,20 @@
-
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   userRole: string | null;
   loading: boolean;
+  signUp: (email: string, password: string, userData: any) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, userData?: any) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUserRole: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  const fetchUserRole = async (userId: string) => {
-    try {
-      console.log('Fetching role for user:', userId);
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching user role:', error);
-        // If no role found, default to student
-        if (error.code === 'PGRST116') {
-          console.log('No role found, defaulting to student');
-          return 'student';
-        }
-        return 'student';
-      }
-      
-      console.log('User role fetched:', data?.role);
-      return data?.role || 'student';
-    } catch (error) {
-      console.error('Error in fetchUserRole:', error);
-      return 'student';
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-        throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: "Signed in successfully!",
-      });
-    } catch (error) {
-      console.error('Sign in error:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signUp = async (email: string, password: string, userData?: any) => {
-    try {
-      setLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: userData,
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-        throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: "Account created successfully! Please check your email for verification.",
-      });
-    } catch (error) {
-      console.error('Sign up error:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshUser = async () => {
-    try {
-      setLoading(true);
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setUser(currentUser);
-      
-      if (currentUser) {
-        const role = await fetchUserRole(currentUser.id);
-        setUserRole(role);
-        console.log('User refreshed with role:', role);
-      } else {
-        setUserRole(null);
-      }
-    } catch (error) {
-      console.error('Error refreshing user:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeAuth = async () => {
-      try {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          setUser(session?.user || null);
-          
-          if (session?.user) {
-            const role = await fetchUserRole(session.user.id);
-            if (mounted) {
-              setUserRole(role);
-              console.log('Initial auth setup complete. User role:', role);
-            }
-          } else {
-            setUserRole(null);
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
-      console.log('Auth state changed:', event, session?.user?.email);
-      
-      setUser(session?.user || null);
-      
-      if (session?.user) {
-        setLoading(true);
-        const role = await fetchUserRole(session.user.id);
-        if (mounted) {
-          setUserRole(role);
-          console.log('Auth state change complete. User role:', role);
-        }
-        setLoading(false);
-      } else {
-        setUserRole(null);
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const signOut = async () => {
-    try {
-      setLoading(true);
-      await supabase.auth.signOut();
-      setUser(null);
-      setUserRole(null);
-      toast({
-        title: "Success",
-        description: "Signed out successfully!",
-      });
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast({
-        title: "Error",
-        description: "Failed to sign out",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, userRole, loading, signIn, signUp, signOut, refreshUser }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -225,4 +22,467 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+};
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
+  const { toast } = useToast();
+  
+  // Refs to prevent multiple concurrent operations
+  const roleUpdateInProgress = useRef(false);
+  const cleanupFunctions = useRef<(() => void)[]>([]);
+  const roleRefreshTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up any existing auth state
+  const cleanupAuthState = useCallback(() => {
+    localStorage.removeItem('supabase.auth.token');
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
+  }, []);
+
+  // Determine the correct dashboard based on role
+  const getDashboardPath = useCallback((role: string) => {
+    switch (role) {
+      case 'admin':
+        return '/admin-dashboard';
+      case 'teacher':
+        return '/teacher-dashboard';
+      case 'student':
+      default:
+        return '/student-dashboard';
+    }
+  }, []);
+
+  // Debounced role fetch to prevent rapid successive calls
+  const fetchUserRole = useCallback(async (userId: string): Promise<string> => {
+    if (roleUpdateInProgress.current) {
+      console.log('Role update already in progress, skipping...');
+      return userRole || 'student';
+    }
+
+    try {
+      roleUpdateInProgress.current = true;
+      console.log('Fetching role for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching user role:', error);
+        
+        if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
+          console.log('Permission denied for role fetch, defaulting to student');
+          setUserRole('student');
+          return 'student';
+        }
+        
+        console.log('Role fetch failed, defaulting to student');
+        setUserRole('student');
+        return 'student';
+      }
+
+      const role = data?.role || 'student';
+      console.log('User role fetched:', role);
+      setUserRole(role);
+      return role;
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+      setUserRole('student');
+      return 'student';
+    } finally {
+      roleUpdateInProgress.current = false;
+    }
+  }, [userRole]);
+
+  // Handle redirection based on role and current location
+  const handleRedirection = useCallback((role: string) => {
+    const currentPath = window.location.pathname;
+    const targetPath = getDashboardPath(role);
+    
+    console.log('Current path:', currentPath, 'Target path:', targetPath, 'Role:', role);
+    
+    if (currentPath !== targetPath) {
+      if (currentPath === '/') {
+        console.log('Redirecting from home to dashboard');
+        setTimeout(() => {
+          window.location.href = targetPath;
+        }, 100);
+        return;
+      }
+      
+      if (currentPath.includes('-dashboard')) {
+        console.log('Redirecting to correct dashboard');
+        setTimeout(() => {
+          window.location.href = targetPath;
+        }, 100);
+        return;
+      }
+    }
+  }, [getDashboardPath]);
+
+  // Cleanup all subscriptions
+  const cleanupSubscriptions = useCallback(() => {
+    console.log('Cleaning up subscriptions...');
+    cleanupFunctions.current.forEach(cleanup => {
+      try {
+        cleanup();
+      } catch (error) {
+        console.error('Error during cleanup:', error);
+      }
+    });
+    cleanupFunctions.current = [];
+    
+    if (roleRefreshTimeout.current) {
+      clearTimeout(roleRefreshTimeout.current);
+      roleRefreshTimeout.current = null;
+    }
+  }, []);
+
+  // Setup real-time listeners for role changes and notifications
+  const setupRealtimeListeners = useCallback((userId: string) => {
+    console.log('Setting up realtime listeners for user:', userId);
+
+    // Clean up existing listeners first
+    cleanupSubscriptions();
+
+    // Listen for role changes with debouncing
+    const roleChangesChannel = supabase
+      .channel(`user-role-changes-${userId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_roles',
+          filter: `user_id=eq.${userId}`
+        },
+        async (payload) => {
+          console.log('User role change detected:', payload);
+          
+          // Clear any existing timeout
+          if (roleRefreshTimeout.current) {
+            clearTimeout(roleRefreshTimeout.current);
+          }
+          
+          // Debounce role refresh to prevent rapid calls
+          roleRefreshTimeout.current = setTimeout(async () => {
+            try {
+              const newRole = await fetchUserRole(userId);
+              
+              toast({
+                title: "Role Updated",
+                description: `Your role has been updated to ${newRole}. Redirecting to appropriate dashboard...`,
+              });
+              
+              setTimeout(() => {
+                handleRedirection(newRole);
+              }, 2000);
+            } catch (error) {
+              console.error('Error handling role change:', error);
+            }
+          }, 1000);
+        }
+      )
+      .subscribe();
+
+    // Listen for notifications
+    const notificationsChannel = supabase
+      .channel(`user-notifications-${userId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('New notification:', payload);
+          
+          const notification = payload.new;
+          if (notification && notification.type === 'general') {
+            toast({
+              title: notification.title,
+              description: notification.message,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Store cleanup functions
+    cleanupFunctions.current = [
+      () => supabase.removeChannel(roleChangesChannel),
+      () => supabase.removeChannel(notificationsChannel)
+    ];
+
+    return cleanupSubscriptions;
+  }, [fetchUserRole, handleRedirection, toast, cleanupSubscriptions]);
+
+  // Refresh user role and handle redirection
+  const refreshUserRole = useCallback(async () => {
+    if (user && !roleUpdateInProgress.current) {
+      console.log('Refreshing user role for:', user.id);
+      const role = await fetchUserRole(user.id);
+      const currentPath = window.location.pathname;
+      if (currentPath === '/' || (currentPath.includes('-dashboard') && currentPath !== getDashboardPath(role))) {
+        handleRedirection(role);
+      }
+    }
+  }, [user, fetchUserRole, getDashboardPath, handleRedirection]);
+
+  // Initialize authentication state
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing auth...');
+        
+        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          if (mounted) {
+            setLoading(false);
+            setInitialized(true);
+          }
+          return;
+        }
+
+        if (currentSession?.user && mounted) {
+          console.log('Found existing session for:', currentSession.user.email);
+          setSession(currentSession);
+          setUser(currentSession.user);
+          
+          await fetchUserRole(currentSession.user.id);
+          setupRealtimeListeners(currentSession.user.id);
+        }
+        
+        if (mounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
+      }
+    };
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        
+        if (!mounted) return;
+
+        // Clean up existing listeners
+        cleanupSubscriptions();
+
+        if (event === 'SIGNED_OUT' || !session) {
+          setSession(null);
+          setUser(null);
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user && initialized) {
+          if (event === 'SIGNED_IN') {
+            const role = await fetchUserRole(session.user.id);
+            setupRealtimeListeners(session.user.id);
+            handleRedirection(role);
+          } else {
+            await fetchUserRole(session.user.id);
+            setupRealtimeListeners(session.user.id);
+          }
+        }
+        
+        setLoading(false);
+      }
+    );
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      cleanupSubscriptions();
+    };
+  }, [initialized, fetchUserRole, setupRealtimeListeners, handleRedirection, cleanupSubscriptions]);
+
+  const signUp = async (email: string, password: string, userData: any) => {
+    try {
+      cleanupAuthState();
+      
+      let role: 'student' | 'teacher' | 'admin' = 'student';
+      
+      if (email.toLowerCase().includes('admin@') || userData.role === 'admin') {
+        role = 'admin';
+      } else if (email.toLowerCase().includes('teacher@') || userData.role === 'teacher') {
+        role = 'teacher';
+      }
+
+      if (!userData.first_name?.trim() || !userData.last_name?.trim()) {
+        throw new Error('First name and last name are required');
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: userData.first_name.trim(),
+            last_name: userData.last_name.trim(),
+            school: userData.school?.trim() || '',
+            grade: userData.grade?.trim() || '',
+            role: role
+          },
+          emailRedirectTo: `${window.location.origin}/`
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Account created successfully!",
+        description: "Please check your email to verify your account.",
+      });
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      
+      let errorMessage = error.message;
+      if (error.message?.includes('User already registered')) {
+        errorMessage = 'An account with this email already exists. Please try signing in instead.';
+      } else if (error.message?.includes('Password')) {
+        errorMessage = 'Password must be at least 6 characters long.';
+      } else if (error.message?.includes('Email')) {
+        errorMessage = 'Please enter a valid email address.';
+      }
+      
+      toast({
+        title: "Sign up failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      cleanupAuthState();
+      
+      if (!email?.trim() || !password?.trim()) {
+        throw new Error('Email and password are required');
+      }
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Welcome back!",
+        description: "You have been logged in successfully.",
+      });
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      
+      let errorMessage = error.message;
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email and click the confirmation link before signing in.';
+      } else if (error.message?.includes('Too many requests')) {
+        errorMessage = 'Too many login attempts. Please wait a moment before trying again.';
+      }
+      
+      toast({
+        title: "Sign in failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      console.log('Starting sign out...');
+      
+      cleanupSubscriptions();
+      setUserRole(null);
+      setUser(null);
+      setSession(null);
+      
+      cleanupAuthState();
+      
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      
+      if (error && 
+          !error.message.includes('session_not_found') && 
+          !error.message.includes('Auth session missing')) {
+        throw error;
+      }
+
+      toast({
+        title: "Signed out",
+        description: "You have been logged out successfully.",
+      });
+      
+      window.location.href = "/";
+      
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      
+      cleanupSubscriptions();
+      setUserRole(null);
+      setUser(null);
+      setSession(null);
+      cleanupAuthState();
+      
+      toast({
+        title: "Signed out",
+        description: "You have been logged out.",
+      });
+      
+      window.location.href = "/";
+    }
+  };
+
+  const value = {
+    user,
+    session,
+    userRole,
+    loading,
+    signUp,
+    signIn,
+    signOut,
+    refreshUserRole
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
