@@ -11,7 +11,8 @@ import { Loader2, RefreshCw } from "lucide-react";
 interface UserProfile {
   id: string;
   email: string;
-  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   role: string;
   created_at: string;
 }
@@ -27,13 +28,13 @@ export const UserManagement = () => {
       setLoading(true);
       console.log('Fetching users...');
       
-      const { data, error } = await supabase
+      // Fetch profiles with roles from user_roles table
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, full_name, role, created_at')
-        .order('created_at', { ascending: false });
+        .select('id, email, first_name, last_name, created_at');
 
-      if (error) {
-        console.error('Error fetching users:', error);
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
         toast({
           title: "Error",
           description: "Failed to fetch users. Please try again.",
@@ -42,8 +43,26 @@ export const UserManagement = () => {
         return;
       }
 
-      console.log('Users fetched successfully:', data?.length);
-      setUsers(data || []);
+      // Fetch user roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+      }
+
+      // Combine profiles with roles
+      const usersWithRoles = (profiles || []).map(profile => {
+        const userRole = (userRoles || []).find(role => role.user_id === profile.id);
+        return {
+          ...profile,
+          role: userRole?.role || 'student'
+        };
+      });
+
+      console.log('Users fetched successfully:', usersWithRoles.length);
+      setUsers(usersWithRoles);
     } catch (error) {
       console.error('Unexpected error fetching users:', error);
       toast({
@@ -57,16 +76,22 @@ export const UserManagement = () => {
   };
 
   const updateUserRole = async (userId: string, newRole: string) => {
-    if (updatingRole) return; // Prevent multiple simultaneous updates
+    if (updatingRole) return;
     
     try {
       setUpdatingRole(userId);
       console.log(`Updating role for user ${userId} to ${newRole}`);
       
+      // Delete existing role
+      await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      // Insert new role
       const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+        .from('user_roles')
+        .insert({ user_id: userId, role: newRole });
 
       if (error) {
         console.error('Error updating user role:', error);
@@ -119,6 +144,13 @@ export const UserManagement = () => {
     }
   };
 
+  const getDisplayName = (user: UserProfile) => {
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+    return user.email;
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -159,7 +191,7 @@ export const UserManagement = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-medium">
-                      {user.full_name || user.email}
+                      {getDisplayName(user)}
                     </h3>
                     <Badge variant={getRoleBadgeVariant(user.role)}>
                       {user.role}

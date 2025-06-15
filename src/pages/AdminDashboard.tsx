@@ -4,10 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { UserManagement } from "@/components/dashboard/UserManagement";
-import { CourseManagement } from "@/components/dashboard/CourseManagement";
-import { AdminSettings } from "@/components/dashboard/AdminSettings";
+import CourseManagement from "@/components/dashboard/CourseManagement";
+import AdminSettings from "@/components/dashboard/AdminSettings";
 import { Users, BookOpen, Activity, TrendingUp } from "lucide-react";
 
 interface DashboardStats {
@@ -35,35 +35,46 @@ const AdminDashboard = () => {
   });
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch stats with simpler queries
+      // Fetch basic stats
       const [usersResponse, coursesResponse, enrollmentsResponse] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact' }),
         supabase.from('courses').select('id', { count: 'exact' }),
         supabase.from('course_enrollments').select('id', { count: 'exact' })
       ]);
 
-      // Fetch recent actions with proper joins
-      const { data: actionsData } = await supabase
+      // Fetch recent enrollments for actions
+      const { data: enrollmentsData } = await supabase
         .from('course_enrollments')
         .select(`
           id,
-          created_at,
-          profiles!course_enrollments_student_id_fkey(email),
-          courses(title)
+          enrolled_at,
+          user_id,
+          course_id
         `)
-        .order('created_at', { ascending: false })
+        .order('enrolled_at', { ascending: false })
         .limit(5);
 
-      const formattedActions: RecentAction[] = (actionsData || []).map(action => ({
-        id: action.id,
-        type: 'enrollment',
-        description: `User enrolled in ${action.courses?.title || 'Unknown Course'}`,
-        timestamp: action.created_at,
-        user_email: action.profiles?.email
-      }));
+      // Get course titles and user emails for recent actions
+      const recentActionsWithDetails = await Promise.all(
+        (enrollmentsData || []).map(async (enrollment) => {
+          const [courseResult, profileResult] = await Promise.all([
+            supabase.from('courses').select('title').eq('id', enrollment.course_id).single(),
+            supabase.from('profiles').select('email').eq('id', enrollment.user_id).single()
+          ]);
+
+          return {
+            id: enrollment.id,
+            type: 'enrollment',
+            description: `User enrolled in ${courseResult.data?.title || 'Unknown Course'}`,
+            timestamp: enrollment.enrolled_at,
+            user_email: profileResult.data?.email || 'Unknown User'
+          };
+        })
+      );
 
       setStats({
         totalUsers: usersResponse.count || 0,
@@ -72,7 +83,7 @@ const AdminDashboard = () => {
         activeUsers: Math.floor((usersResponse.count || 0) * 0.7) // Estimate 70% active
       });
 
-      setRecentActions(formattedActions);
+      setRecentActions(recentActionsWithDetails);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -103,7 +114,11 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader userRole={userRole || ''} />
+      <DashboardHeader 
+        title="Admin Dashboard"
+        showSettings={true}
+        onSettingsClick={() => setShowSettings(true)}
+      />
       
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -202,7 +217,7 @@ const AdminDashboard = () => {
           </TabsContent>
           
           <TabsContent value="settings" className="mt-6">
-            <AdminSettings />
+            <AdminSettings open={showSettings} onOpenChange={setShowSettings} />
           </TabsContent>
         </Tabs>
       </div>
