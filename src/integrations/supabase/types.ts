@@ -633,6 +633,10 @@ export type Database = {
         Args: { discussion_id: string }
         Returns: undefined
       }
+      update_user_role: {
+        Args: { target_user_id: string; new_role: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "student" | "teacher" | "admin"

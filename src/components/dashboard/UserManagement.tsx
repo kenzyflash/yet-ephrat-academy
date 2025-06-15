@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, UserCheck, Search, Edit, Shield, AlertTriangle } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Users, UserCheck, Search, Edit, Shield, AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,23 +27,54 @@ interface User {
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [pendingRoleChange, setPendingRoleChange] = useState<{userId: string, newRole: string, userName: string} | null>(null);
   const { toast } = useToast();
-  const { userRole } = useAuth();
+  const { userRole, user: currentUser, refreshUserRole } = useAuth();
 
   useEffect(() => {
     fetchUsers();
+    setupRealtimeSubscriptions();
   }, []);
+
+  const setupRealtimeSubscriptions = () => {
+    // Listen for role changes in real-time
+    const roleChangesChannel = supabase
+      .channel('user-role-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_roles'
+        },
+        (payload) => {
+          console.log('Role change detected:', payload);
+          // Refresh the user list when roles change
+          fetchUsers();
+          
+          // If the current user's role changed, refresh their session
+          if (payload.new?.user_id === currentUser?.id || payload.old?.user_id === currentUser?.id) {
+            refreshUserRole();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roleChangesChannel);
+    };
+  };
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       console.log('Fetching users with admin access...');
       
-      // Only admins can access user management
       if (userRole !== 'admin') {
         toast({
           title: "Access Denied",
@@ -51,7 +84,6 @@ const UserManagement = () => {
         return;
       }
 
-      // Use the new security definer function to get all users with roles
       const { data: usersWithRoles, error } = await supabase
         .rpc('get_all_users_with_roles');
 
@@ -62,7 +94,6 @@ const UserManagement = () => {
 
       console.log('Users fetched via RPC:', usersWithRoles?.length, usersWithRoles);
 
-      // Transform the data to match our User interface
       const transformedUsers: User[] = usersWithRoles?.map(user => ({
         id: user.id,
         first_name: user.first_name || 'Unknown',
@@ -85,7 +116,6 @@ const UserManagement = () => {
     } catch (error: any) {
       console.error('Error in fetchUsers:', error);
       
-      // Provide more specific error messages
       let errorMessage = "Failed to load users. Please try again.";
       if (error.message?.includes('Access denied')) {
         errorMessage = "Access denied. You may not have the required admin permissions.";
@@ -105,64 +135,49 @@ const UserManagement = () => {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'student' | 'teacher' | 'admin') => {
+  const handleRoleChangeConfirm = async () => {
+    if (!pendingRoleChange) return;
+
+    const { userId, newRole } = pendingRoleChange;
+    
     try {
+      setUpdating(userId);
       console.log(`Updating role for user ${userId} to ${newRole}`);
       
-      // Validate admin permissions
       if (userRole !== 'admin') {
         throw new Error('Only administrators can update user roles');
       }
 
-      // Validate input
-      if (!userId || !newRole) {
-        throw new Error('Invalid user ID or role');
+      // Use the new secure function
+      const { data, error } = await supabase
+        .rpc('update_user_role', {
+          target_user_id: userId,
+          new_role: newRole
+        });
+
+      if (error) {
+        console.error('Role update error:', error);
+        throw new Error(`Failed to update role: ${error.message}`);
       }
 
-      // Check if user already has a role
-      const { data: existingRole, error: checkError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Error checking existing role:', checkError);
-        throw new Error(`Failed to check existing role: ${checkError.message}`);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update role');
       }
 
-      if (existingRole) {
-        // Update existing role
-        const { error: updateError } = await supabase
-          .from('user_roles')
-          .update({ role: newRole })
-          .eq('user_id', userId);
-
-        if (updateError) {
-          console.error('Update error:', updateError);
-          throw new Error(`Failed to update role: ${updateError.message}`);
-        }
-      } else {
-        // Insert new role
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: newRole });
-
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          throw new Error(`Failed to assign role: ${insertError.message}`);
-        }
-      }
-
-      // Update local state
+      // Update local state immediately for better UX
       setUsers(users.map(user => 
-        user.id === userId ? { ...user, role: newRole } : user
+        user.id === userId ? { ...user, role: newRole as any } : user
       ));
       
       toast({
         title: "Role Updated",
-        description: `User role has been updated to ${newRole}.`,
+        description: data.message || `User role has been updated to ${newRole}.`,
       });
+      
+      // Refresh the user list to ensure consistency
+      setTimeout(() => {
+        fetchUsers();
+      }, 1000);
       
     } catch (error: any) {
       console.error('Error updating role:', error);
@@ -170,8 +185,10 @@ const UserManagement = () => {
       let errorMessage = "Failed to update user role. Please try again.";
       if (error.message?.includes('permission denied')) {
         errorMessage = "Permission denied. You may not have admin rights.";
-      } else if (error.message?.includes('RLS')) {
-        errorMessage = "Access restricted by security policy.";
+      } else if (error.message?.includes('Cannot remove your own admin privileges')) {
+        errorMessage = "You cannot remove your own admin privileges.";
+      } else if (error.message?.includes('Access denied')) {
+        errorMessage = "Access denied. Admin role required.";
       }
       
       toast({
@@ -179,6 +196,30 @@ const UserManagement = () => {
         description: errorMessage,
         variant: "destructive"
       });
+    } finally {
+      setUpdating(null);
+      setPendingRoleChange(null);
+    }
+  };
+
+  const initiateRoleChange = (userId: string, newRole: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+
+    // Check if it's a critical change that needs confirmation
+    const isCriticalChange = (user.role === 'admin' && newRole !== 'admin') || 
+                           (newRole === 'admin' && user.role !== 'admin');
+
+    if (isCriticalChange) {
+      setPendingRoleChange({
+        userId,
+        newRole,
+        userName: `${user.first_name} ${user.last_name}`
+      });
+    } else {
+      // For non-critical changes, proceed directly
+      setPendingRoleChange({ userId, newRole, userName: `${user.first_name} ${user.last_name}` });
+      setTimeout(() => handleRoleChangeConfirm(), 0);
     }
   };
 
@@ -186,17 +227,14 @@ const UserManagement = () => {
     if (!editingUser) return;
 
     try {
-      // Validate admin permissions
       if (userRole !== 'admin') {
         throw new Error('Only administrators can update user profiles');
       }
 
-      // Validate required fields
       if (!editingUser.first_name?.trim() || !editingUser.last_name?.trim() || !editingUser.email?.trim()) {
         throw new Error('First name, last name, and email are required');
       }
 
-      // Validate email format
       const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
       if (!emailRegex.test(editingUser.email)) {
         throw new Error('Please enter a valid email address');
@@ -274,7 +312,6 @@ const UserManagement = () => {
 
   const stats = getUserStats();
 
-  // Check if user has admin access
   if (userRole !== 'admin') {
     return (
       <Card className="bg-white/80 backdrop-blur-sm">
@@ -312,7 +349,7 @@ const UserManagement = () => {
             <Shield className="h-5 w-5 text-blue-600" />
             <div>
               <p className="text-sm font-medium text-blue-900">Enhanced Security Active</p>
-              <p className="text-xs text-blue-700">Row-level security policies are now enforced. All actions are logged for audit purposes.</p>
+              <p className="text-xs text-blue-700">Real-time role synchronization enabled. All actions are logged and validated server-side.</p>
             </div>
           </div>
         </CardContent>
@@ -396,8 +433,8 @@ const UserManagement = () => {
                 <SelectItem value="admin">Admins</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={fetchUsers} variant="outline">
-              Refresh
+            <Button onClick={fetchUsers} variant="outline" disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
             </Button>
           </div>
 
@@ -445,10 +482,18 @@ const UserManagement = () => {
                       <div className="flex gap-2">
                         <Select
                           value={user.role}
-                          onValueChange={(value) => updateUserRole(user.id, value as any)}
+                          onValueChange={(value) => initiateRoleChange(user.id, value)}
+                          disabled={updating === user.id}
                         >
                           <SelectTrigger className="w-32">
-                            <SelectValue />
+                            {updating === user.id ? (
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="text-xs">Updating...</span>
+                              </div>
+                            ) : (
+                              <SelectValue />
+                            )}
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="student">Student</SelectItem>
@@ -462,6 +507,7 @@ const UserManagement = () => {
                               variant="outline" 
                               size="sm"
                               onClick={() => setEditingUser(user)}
+                              disabled={updating === user.id}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -537,6 +583,36 @@ const UserManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Role Change Confirmation Dialog */}
+      <AlertDialog open={!!pendingRoleChange} onOpenChange={() => setPendingRoleChange(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
+              Confirm Role Change
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRoleChange && (
+                <>
+                  Are you sure you want to change <strong>{pendingRoleChange.userName}</strong>'s role to <strong>{pendingRoleChange.newRole}</strong>?
+                  {(pendingRoleChange.newRole === 'admin' || pendingRoleChange.userId === currentUser?.id) && (
+                    <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-orange-800 text-sm">
+                      <strong>Warning:</strong> This is a critical role change that will affect system access permissions.
+                    </div>
+                  )}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRoleChangeConfirm} className="bg-emerald-600 hover:bg-emerald-700">
+              Confirm Change
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -61,7 +61,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       console.log('Fetching role for user:', userId);
       
-      // Use maybeSingle() to handle cases where no role exists
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
@@ -71,14 +70,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('Error fetching user role:', error);
         
-        // Check if it's a permission error due to RLS
         if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
           console.log('Permission denied for role fetch, defaulting to student');
           setUserRole('student');
           return 'student';
         }
         
-        // For other errors, also default to student
         console.log('Role fetch failed, defaulting to student');
         setUserRole('student');
         return 'student';
@@ -102,9 +99,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     
     console.log('Current path:', currentPath, 'Target path:', targetPath, 'Role:', role);
     
-    // Prevent redirection loops - only redirect if we're not already on the correct page
     if (currentPath !== targetPath) {
-      // If we're on the home page and authenticated, redirect to dashboard
       if (currentPath === '/') {
         console.log('Redirecting from home to dashboard');
         setTimeout(() => {
@@ -113,7 +108,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       
-      // If we're on a dashboard but it's the wrong one for our role
       if (currentPath.includes('-dashboard')) {
         console.log('Redirecting to correct dashboard');
         setTimeout(() => {
@@ -124,11 +118,77 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Setup real-time listeners for role changes and notifications
+  const setupRealtimeListeners = (userId: string) => {
+    console.log('Setting up realtime listeners for user:', userId);
+
+    // Listen for role changes
+    const roleChangesChannel = supabase
+      .channel(`user-role-changes-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_roles',
+          filter: `user_id=eq.${userId}`
+        },
+        async (payload) => {
+          console.log('User role change detected:', payload);
+          
+          // Fetch the updated role
+          const newRole = await fetchUserRole(userId);
+          
+          // Show notification about role change
+          toast({
+            title: "Role Updated",
+            description: `Your role has been updated to ${newRole}. Redirecting to appropriate dashboard...`,
+          });
+          
+          // Redirect to appropriate dashboard after a short delay
+          setTimeout(() => {
+            handleRedirection(newRole);
+          }, 2000);
+        }
+      )
+      .subscribe();
+
+    // Listen for notifications
+    const notificationsChannel = supabase
+      .channel(`user-notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('New notification:', payload);
+          
+          const notification = payload.new;
+          if (notification && notification.type === 'general') {
+            toast({
+              title: notification.title,
+              description: notification.message,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(roleChangesChannel);
+      supabase.removeChannel(notificationsChannel);
+    };
+  };
+
   // Refresh user role and handle redirection
   const refreshUserRole = async () => {
     if (user) {
+      console.log('Refreshing user role for:', user.id);
       const role = await fetchUserRole(user.id);
-      // Only redirect if we're on the home page or wrong dashboard
       const currentPath = window.location.pathname;
       if (currentPath === '/' || (currentPath.includes('-dashboard') && currentPath !== getDashboardPath(role))) {
         handleRedirection(role);
@@ -139,12 +199,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Initialize authentication state
   useEffect(() => {
     let mounted = true;
+    let cleanupRealtime: (() => void) | null = null;
 
     const initializeAuth = async () => {
       try {
         console.log('Initializing auth...');
         
-        // Get current session
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -161,8 +221,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // Fetch role but don't redirect during initial load
           await fetchUserRole(currentSession.user.id);
+          cleanupRealtime = setupRealtimeListeners(currentSession.user.id);
         }
         
         if (mounted) {
@@ -185,6 +245,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (!mounted) return;
 
+        // Clean up existing realtime listeners
+        if (cleanupRealtime) {
+          cleanupRealtime();
+          cleanupRealtime = null;
+        }
+
         if (event === 'SIGNED_OUT' || !session) {
           setSession(null);
           setUser(null);
@@ -197,13 +263,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user && initialized) {
-          // For sign in events after initialization, fetch role and redirect
           if (event === 'SIGNED_IN') {
             const role = await fetchUserRole(session.user.id);
+            cleanupRealtime = setupRealtimeListeners(session.user.id);
             handleRedirection(role);
           } else {
-            // For other events, just fetch the role without redirecting
             await fetchUserRole(session.user.id);
+            cleanupRealtime = setupRealtimeListeners(session.user.id);
           }
         }
         
@@ -211,12 +277,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Initialize auth state
     initializeAuth();
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      if (cleanupRealtime) {
+        cleanupRealtime();
+      }
     };
   }, [initialized]);
 
@@ -224,17 +292,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       cleanupAuthState();
       
-      // Enhanced role determination with validation
       let role: 'student' | 'teacher' | 'admin' = 'student';
       
-      // Check email patterns more strictly
       if (email.toLowerCase().includes('admin@') || userData.role === 'admin') {
         role = 'admin';
       } else if (email.toLowerCase().includes('teacher@') || userData.role === 'teacher') {
         role = 'teacher';
       }
 
-      // Validate required fields
       if (!userData.first_name?.trim() || !userData.last_name?.trim()) {
         throw new Error('First name and last name are required');
       }
@@ -344,13 +409,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "You have been logged out successfully.",
       });
       
-      // Redirect to home page
       window.location.href = "/";
       
     } catch (error: any) {
       console.error('Sign out error:', error);
       
-      // Even if there's an error, clear the state and redirect
       setUserRole(null);
       setUser(null);
       setSession(null);
