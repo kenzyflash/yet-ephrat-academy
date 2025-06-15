@@ -597,6 +597,23 @@ export type Database = {
         Args: { discussion_id: string }
         Returns: undefined
       }
+      get_all_users_with_roles: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          first_name: string
+          last_name: string
+          email: string
+          school: string
+          grade: string
+          created_at: string
+          role: string
+        }[]
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       has_role: {
         Args: {
           _user_id: string

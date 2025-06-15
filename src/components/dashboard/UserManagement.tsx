@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users...');
+      console.log('Fetching users with admin access...');
       
       // Only admins can access user management
       if (userRole !== 'admin') {
@@ -52,67 +51,35 @@ const UserManagement = () => {
         return;
       }
 
-      // First, fetch all profiles with proper error handling
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use the new security definer function to get all users with roles
+      const { data: usersWithRoles, error } = await supabase
+        .rpc('get_all_users_with_roles');
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
+      if (error) {
+        console.error('Error fetching users via RPC:', error);
+        throw new Error(`Failed to fetch users: ${error.message}`);
       }
 
-      console.log('Profiles fetched:', profiles?.length);
+      console.log('Users fetched via RPC:', usersWithRoles?.length, usersWithRoles);
 
-      // Then, fetch all user roles with better error handling
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      // Transform the data to match our User interface
+      const transformedUsers: User[] = usersWithRoles?.map(user => ({
+        id: user.id,
+        first_name: user.first_name || 'Unknown',
+        last_name: user.last_name || 'User',
+        email: user.email,
+        role: user.role as 'student' | 'teacher' | 'admin',
+        created_at: user.created_at,
+        school: user.school || undefined,
+        grade: user.grade || undefined
+      })) || [];
 
-      if (rolesError) {
-        console.error('Error fetching roles:', rolesError);
-        // Don't throw here, just log and continue with default roles
-        console.warn('Could not fetch user roles, using default role assignments');
-      }
-
-      console.log('Roles fetched:', userRoles?.length);
-
-      // Create a map of user_id to role for quick lookup
-      const roleMap = new Map<string, string>();
-      userRoles?.forEach(userRole => {
-        roleMap.set(userRole.user_id, userRole.role);
-      });
-
-      console.log('Role map:', Object.fromEntries(roleMap));
-
-      // Combine profiles with their roles, with better validation
-      const usersWithRoles: User[] = profiles?.map(profile => {
-        // Validate required fields
-        if (!profile.id || !profile.email) {
-          console.warn('Invalid profile data:', profile);
-          return null;
-        }
-
-        const userRole = roleMap.get(profile.id) || 'student';
-        return {
-          id: profile.id,
-          first_name: profile.first_name || 'Unknown',
-          last_name: profile.last_name || 'User',
-          email: profile.email,
-          role: userRole as 'student' | 'teacher' | 'admin',
-          created_at: profile.created_at,
-          school: profile.school || undefined,
-          grade: profile.grade || undefined
-        };
-      }).filter(Boolean) || [];
-
-      console.log('Final users with roles:', usersWithRoles);
-      setUsers(usersWithRoles);
+      console.log('Transformed users:', transformedUsers);
+      setUsers(transformedUsers);
       
       toast({
         title: "Users Loaded",
-        description: `Successfully loaded ${usersWithRoles.length} users.`,
+        description: `Successfully loaded ${transformedUsers.length} users.`,
       });
       
     } catch (error: any) {
@@ -120,8 +87,10 @@ const UserManagement = () => {
       
       // Provide more specific error messages
       let errorMessage = "Failed to load users. Please try again.";
-      if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
-        errorMessage = "Access denied. You may not have the required permissions.";
+      if (error.message?.includes('Access denied')) {
+        errorMessage = "Access denied. You may not have the required admin permissions.";
+      } else if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
+        errorMessage = "Access denied. Please ensure you have admin privileges.";
       } else if (error.message?.includes('network')) {
         errorMessage = "Network error. Please check your connection.";
       }
