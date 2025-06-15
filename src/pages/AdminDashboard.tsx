@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,18 +12,21 @@ import {
   BarChart3,
   UserCheck,
   GraduationCap,
-  TrendingUp
+  TrendingUp,
+  MessageSquare
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardStats from "@/components/dashboard/DashboardStats";
 import UserManagement from "@/components/dashboard/UserManagement";
+import ContactManagement from "@/components/dashboard/ContactManagement";
 import AdminSettings from "@/components/dashboard/AdminSettings";
 
 const AdminDashboard = () => {
   const { user, userRole } = useAuth();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [systemStats, setSystemStats] = useState([
     { label: "Total Users", value: "0", icon: Users, color: "text-blue-600", change: "+0%" },
     { label: "Active Courses", value: "0", icon: BookOpen, color: "text-green-600", change: "+0%" },
@@ -188,7 +192,30 @@ const AdminDashboard = () => {
         console.error('Error fetching recent courses:', coursesError);
       }
 
+      // Fetch recent contact inquiries
+      const { data: recentInquiries, error: inquiriesError } = await supabase
+        .from('contact_inquiries')
+        .select('name, subject, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (inquiriesError) {
+        console.error('Error fetching recent inquiries:', inquiriesError);
+      }
+
       const actions = [];
+
+      // Add contact inquiries
+      if (recentInquiries && recentInquiries.length > 0) {
+        recentInquiries.forEach(inquiry => {
+          actions.push({
+            action: "New contact inquiry",
+            details: `${inquiry.name}: ${inquiry.subject}`,
+            time: new Date(inquiry.created_at).toLocaleString(),
+            type: "contact"
+          });
+        });
+      }
 
       // Add user registrations
       if (recentUsers && recentUsers.length > 0) {
@@ -225,14 +252,6 @@ const AdminDashboard = () => {
           });
         });
       }
-
-      // Add system action
-      actions.push({
-        action: "System backup completed",
-        details: "All data secured successfully",
-        time: new Date().toLocaleString(),
-        type: "system"
-      });
 
       // Sort by time and take the most recent 5
       const sortedActions = actions
@@ -349,104 +368,184 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          <DashboardStats stats={systemStats} />
-
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <UserManagement />
-            </div>
-
-            <div className="space-y-6">
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-orange-600" />
-                    Recent Actions
-                  </CardTitle>
-                  <CardDescription>Latest system activities and user actions</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {recentActions.length === 0 ? (
-                    <div className="text-center py-4">
-                      <p className="text-gray-500 text-sm">No recent actions available.</p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={fetchRecentActions}
-                      >
-                        Refresh
-                      </Button>
-                    </div>
-                  ) : (
-                    recentActions.map((action, index) => (
-                      <div key={index} className="p-3 border rounded-lg hover:bg-gray-50 transition-colors">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-800 text-sm mb-1">{action.action}</p>
-                            <p className="text-xs text-gray-600 mb-2">{action.details}</p>
-                            <span className="text-xs text-gray-500">{action.time}</span>
-                          </div>
-                          <Badge 
-                            variant="outline" 
-                            className={
-                              action.type === 'user' ? 'bg-blue-50 text-blue-700' :
-                              action.type === 'course' ? 'bg-green-50 text-green-700' :
-                              action.type === 'enrollment' ? 'bg-purple-50 text-purple-700' :
-                              'bg-gray-50 text-gray-700'
-                            }
-                          >
-                            {action.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                    System Overview
-                  </CardTitle>
-                  <CardDescription>Real-time system health and metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span>Server Uptime</span>
-                      <span className="font-medium text-green-600">{systemOverview.serverUptime}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Database Size</span>
-                      <span className="font-medium">{systemOverview.databaseSize}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Active Sessions (1hr)</span>
-                      <span className="font-medium text-blue-600">{systemOverview.activeSessions}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Support Tickets</span>
-                      <span className="font-medium text-orange-600">{systemOverview.supportTickets}</span>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-3 border-t">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full"
-                      onClick={fetchSystemOverview}
-                    >
-                      Refresh Metrics
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Navigation Tabs */}
+          <div className="mb-6">
+            <div className="flex space-x-1 bg-white/80 backdrop-blur-sm rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                  activeTab === 'overview' 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                  activeTab === 'users' 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                Users
+              </button>
+              <button
+                onClick={() => setActiveTab('contact')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                  activeTab === 'contact' 
+                    ? 'bg-emerald-600 text-white' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Contact Forms
+              </button>
             </div>
           </div>
+
+          {activeTab === 'overview' && (
+            <>
+              <DashboardStats stats={systemStats} />
+
+              {/* Main Content */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle>Quick Actions</CardTitle>
+                      <CardDescription>Common administrative tasks</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                          onClick={() => setActiveTab('users')}
+                        >
+                          <Users className="h-4 w-4" />
+                          Manage Users
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                          onClick={() => setActiveTab('contact')}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          View Contact Forms
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                          onClick={() => setIsSettingsOpen(true)}
+                        >
+                          <Settings className="h-4 w-4" />
+                          System Settings
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-6">
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Bell className="h-5 w-5 text-orange-600" />
+                        Recent Actions
+                      </CardTitle>
+                      <CardDescription>Latest system activities and user actions</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {recentActions.length === 0 ? (
+                        <div className="text-center py-4">
+                          <p className="text-gray-500 text-sm">No recent actions available.</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={fetchRecentActions}
+                          >
+                            Refresh
+                          </Button>
+                        </div>
+                      ) : (
+                        recentActions.map((action, index) => (
+                          <div key={index} className="p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-800 text-sm mb-1">{action.action}</p>
+                                <p className="text-xs text-gray-600 mb-2">{action.details}</p>
+                                <span className="text-xs text-gray-500">{action.time}</span>
+                              </div>
+                              <Badge 
+                                variant="outline" 
+                                className={
+                                  action.type === 'user' ? 'bg-blue-50 text-blue-700' :
+                                  action.type === 'course' ? 'bg-green-50 text-green-700' :
+                                  action.type === 'enrollment' ? 'bg-purple-50 text-purple-700' :
+                                  action.type === 'contact' ? 'bg-orange-50 text-orange-700' :
+                                  'bg-gray-50 text-gray-700'
+                                }
+                              >
+                                {action.type}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-white/80 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5 text-purple-600" />
+                        System Overview
+                      </CardTitle>
+                      <CardDescription>Real-time system health and metrics</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span>Server Uptime</span>
+                          <span className="font-medium text-green-600">{systemOverview.serverUptime}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Database Size</span>
+                          <span className="font-medium">{systemOverview.databaseSize}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Active Sessions (1hr)</span>
+                          <span className="font-medium text-blue-600">{systemOverview.activeSessions}</span>
+                        </div>
+                        <div className="flex justify-between text-sm cursor-pointer" onClick={() => setActiveTab('contact')}>
+                          <span>Support Tickets</span>
+                          <span className="font-medium text-orange-600 hover:underline">{systemOverview.supportTickets}</span>
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-3 border-t">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={fetchSystemOverview}
+                        >
+                          Refresh Metrics
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'users' && <UserManagement />}
+          {activeTab === 'contact' && <ContactManagement />}
         </div>
 
         <AdminSettings open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
