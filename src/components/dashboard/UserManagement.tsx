@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,10 +87,13 @@ export const UserManagement = () => {
         .delete()
         .eq('user_id', userId);
 
-      // Insert new role
+      // Insert new role with proper type casting
       const { error } = await supabase
         .from('user_roles')
-        .insert({ user_id: userId, role: newRole });
+        .insert({ 
+          user_id: userId, 
+          role: newRole as "student" | "teacher" | "admin"
+        });
 
       if (error) {
         console.error('Error updating user role:', error);
