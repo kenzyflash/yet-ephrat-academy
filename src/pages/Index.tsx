@@ -12,7 +12,7 @@ import Footer from "@/components/Footer";
 const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const { user } = useAuth();
+  const { user, userRole, loading } = useAuth();
 
   const handleSwitchToRegister = () => {
     setShowLogin(false);
@@ -22,6 +22,32 @@ const Index = () => {
   const handleSwitchToLogin = () => {
     setShowRegister(false);
     setShowLogin(true);
+  };
+
+  // Get the correct dashboard path based on user role
+  const getDashboardPath = () => {
+    switch (userRole) {
+      case 'admin':
+        return '/admin-dashboard';
+      case 'teacher':
+        return '/teacher-dashboard';
+      case 'student':
+      default:
+        return '/student-dashboard';
+    }
+  };
+
+  // Get the correct dashboard label based on user role
+  const getDashboardLabel = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Admin Dashboard';
+      case 'teacher':
+        return 'Teacher Dashboard';
+      case 'student':
+      default:
+        return 'Student Dashboard';
+    }
   };
 
   const features = [
@@ -92,9 +118,18 @@ const Index = () => {
           </div>
           <div className="flex items-center space-x-4">
             {user ? (
-              <Button onClick={() => window.location.href = user.user_metadata?.role === 'admin' ? '/admin-dashboard' : user.user_metadata?.role === 'teacher' ? '/teacher-dashboard' : '/student-dashboard'}>
-                Dashboard
-              </Button>
+              // Show loading state while userRole is being fetched
+              loading || !userRole ? (
+                <Button disabled>
+                  Loading...
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link to={getDashboardPath()}>
+                    {getDashboardLabel()}
+                  </Link>
+                </Button>
+              )
             ) : (
               <>
                 <Button variant="ghost" onClick={() => setShowLogin(true)}>
