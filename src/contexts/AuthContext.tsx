@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Debounced role fetch to prevent rapid successive calls
+  // Enhanced role fetch with proper error handling and logging
   const fetchUserRole = useCallback(async (userId: string): Promise<string> => {
     if (roleUpdateInProgress.current) {
       console.log('Role update already in progress, skipping...');
@@ -80,23 +81,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         console.error('Error fetching user role:', error);
         
-        if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
-          console.log('Permission denied for role fetch, defaulting to student');
-          setUserRole('student');
-          return 'student';
+        // Log security event for failed role fetch
+        try {
+          await supabase.rpc('log_security_event', {
+            action: 'ROLE_FETCH_FAILED',
+            resource_type: 'user_roles',
+            resource_id: userId,
+            details: { error: error.message }
+          });
+        } catch (logError) {
+          console.error('Failed to log security event:', logError);
         }
         
-        console.log('Role fetch failed, defaulting to student');
+        // Secure fallback: default to student but log the failure
+        console.warn('Role fetch failed, defaulting to student for security');
         setUserRole('student');
         return 'student';
       }
 
       const role = data?.role || 'student';
-      console.log('User role fetched:', role);
+      console.log('User role fetched successfully:', role);
       setUserRole(role);
       return role;
     } catch (error) {
-      console.error('Error fetching user role:', error);
+      console.error('Unexpected error fetching user role:', error);
+      
+      // Log critical security event
+      try {
+        await supabase.rpc('log_security_event', {
+          action: 'ROLE_FETCH_CRITICAL_ERROR',
+          resource_type: 'user_roles',
+          resource_id: userId,
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        });
+      } catch (logError) {
+        console.error('Failed to log critical security event:', logError);
+      }
+      
       setUserRole('student');
       return 'student';
     } finally {
@@ -148,14 +169,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Setup real-time listeners for role changes and notifications
+  // Setup secure real-time listeners with user-specific filtering
   const setupRealtimeListeners = useCallback((userId: string) => {
-    console.log('Setting up realtime listeners for user:', userId);
+    console.log('Setting up secure realtime listeners for user:', userId);
 
     // Clean up existing listeners first
     cleanupSubscriptions();
 
-    // Listen for role changes with debouncing
+    // Listen for role changes with enhanced security
     const roleChangesChannel = supabase
       .channel(`user-role-changes-${userId}-${Date.now()}`)
       .on(
@@ -164,10 +185,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           event: '*',
           schema: 'public',
           table: 'user_roles',
-          filter: `user_id=eq.${userId}`
+          filter: `user_id=eq.${userId}` // User-specific filtering for security
         },
         async (payload) => {
-          console.log('User role change detected:', payload);
+          console.log('Secure role change detected:', payload);
+          
+          // Verify the change is for the current user
+          if (payload.new && typeof payload.new === 'object' && 'user_id' in payload.new) {
+            if (payload.new.user_id !== userId) {
+              console.warn('Received role change for different user, ignoring for security');
+              return;
+            }
+          }
           
           // Clear any existing timeout
           if (roleRefreshTimeout.current) {
@@ -195,7 +224,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       )
       .subscribe();
 
-    // Listen for notifications
+    // Listen for user-specific notifications only
     const notificationsChannel = supabase
       .channel(`user-notifications-${userId}-${Date.now()}`)
       .on(
@@ -204,10 +233,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${userId}`
+          filter: `user_id=eq.${userId}` // User-specific filtering
         },
         (payload) => {
-          console.log('New notification:', payload);
+          console.log('Secure notification received:', payload);
           
           const notification = payload.new;
           if (notification && notification.type === 'general') {
@@ -247,7 +276,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
-        console.log('Initializing auth...');
+        console.log('Initializing secure auth...');
         
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
@@ -282,10 +311,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    // Set up auth state listener
+    // Set up secure auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('Secure auth state changed:', event, session?.user?.email);
         
         if (!mounted) return;
 
@@ -327,32 +356,66 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [initialized, fetchUserRole, setupRealtimeListeners, handleRedirection, cleanupSubscriptions]);
 
+  // Enhanced input validation and sanitization
+  const validateInput = (input: string, type: 'email' | 'name' | 'text'): string => {
+    if (!input || typeof input !== 'string') {
+      throw new Error('Invalid input provided');
+    }
+
+    const sanitized = input.trim().slice(0, 255); // Basic length limit
+
+    switch (type) {
+      case 'email':
+        const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        if (!emailRegex.test(sanitized)) {
+          throw new Error('Invalid email format');
+        }
+        break;
+      case 'name':
+        const nameRegex = /^[A-Za-z\s'-]{1,50}$/;
+        if (!nameRegex.test(sanitized)) {
+          throw new Error('Name contains invalid characters');
+        }
+        break;
+      case 'text':
+        // Basic XSS prevention
+        if (/<script|javascript:|data:|vbscript:/i.test(sanitized)) {
+          throw new Error('Invalid characters detected');
+        }
+        break;
+    }
+
+    return sanitized;
+  };
+
   const signUp = async (email: string, password: string, userData: any) => {
     try {
       cleanupAuthState();
-      
-      let role: 'student' | 'teacher' | 'admin' = 'student';
-      
-      if (email.toLowerCase().includes('admin@') || userData.role === 'admin') {
-        role = 'admin';
-      } else if (email.toLowerCase().includes('teacher@') || userData.role === 'teacher') {
-        role = 'teacher';
+
+      // Validate and sanitize inputs
+      const cleanEmail = validateInput(email, 'email').toLowerCase();
+      const cleanFirstName = validateInput(userData.first_name, 'name');
+      const cleanLastName = validateInput(userData.last_name, 'name');
+      const cleanSchool = userData.school ? validateInput(userData.school, 'text') : '';
+      const cleanGrade = userData.grade ? validateInput(userData.grade, 'text') : '';
+
+      if (password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
       }
 
-      if (!userData.first_name?.trim() || !userData.last_name?.trim()) {
-        throw new Error('First name and last name are required');
-      }
+      // Remove email-based role assignment for security
+      const defaultRole = 'student'; // Always default to student
 
       const { error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
           data: {
-            first_name: userData.first_name.trim(),
-            last_name: userData.last_name.trim(),
-            school: userData.school?.trim() || '',
-            grade: userData.grade?.trim() || '',
-            role: role
+            first_name: cleanFirstName,
+            last_name: cleanLastName,
+            school: cleanSchool,
+            grade: cleanGrade,
+            role: defaultRole
           },
           emailRedirectTo: `${window.location.origin}/`
         }
@@ -389,12 +452,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       cleanupAuthState();
       
-      if (!email?.trim() || !password?.trim()) {
-        throw new Error('Email and password are required');
+      // Validate inputs
+      const cleanEmail = validateInput(email, 'email').toLowerCase();
+      
+      if (!password?.trim()) {
+        throw new Error('Password is required');
       }
       
       const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: cleanEmail,
         password
       });
 
@@ -427,7 +493,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
-      console.log('Starting sign out...');
+      console.log('Starting secure sign out...');
       
       cleanupSubscriptions();
       setUserRole(null);

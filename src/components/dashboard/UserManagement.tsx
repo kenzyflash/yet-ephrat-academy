@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,37 @@ const UserManagement = () => {
   const componentMounted = useRef(true);
   const realtimeCleanup = useRef<(() => void) | null>(null);
 
+  // Enhanced input validation
+  const validateInput = (input: string, type: 'email' | 'name' | 'text'): string => {
+    if (!input || typeof input !== 'string') {
+      throw new Error('Invalid input provided');
+    }
+
+    const sanitized = input.trim().slice(0, 255);
+
+    switch (type) {
+      case 'email':
+        const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+        if (!emailRegex.test(sanitized)) {
+          throw new Error('Invalid email format');
+        }
+        break;
+      case 'name':
+        const nameRegex = /^[A-Za-z\s'-]{1,50}$/;
+        if (!nameRegex.test(sanitized)) {
+          throw new Error('Name contains invalid characters');
+        }
+        break;
+      case 'text':
+        if (/<script|javascript:|data:|vbscript:/i.test(sanitized)) {
+          throw new Error('Invalid characters detected');
+        }
+        break;
+    }
+
+    return sanitized;
+  };
+
   useEffect(() => {
     componentMounted.current = true;
     if (userRole === 'admin') {
@@ -66,13 +98,13 @@ const UserManagement = () => {
   const initializeUserManagement = async () => {
     try {
       await fetchUsers();
-      setupRealtimeSubscriptions();
+      setupSecureRealtimeSubscriptions();
     } catch (error) {
       console.error('Error initializing user management:', error);
     }
   };
 
-  const setupRealtimeSubscriptions = useCallback(() => {
+  const setupSecureRealtimeSubscriptions = useCallback(() => {
     if (userRole !== 'admin') return;
 
     // Clean up existing subscription
@@ -80,9 +112,9 @@ const UserManagement = () => {
       realtimeCleanup.current();
     }
 
-    console.log('Setting up user management realtime subscriptions...');
+    console.log('Setting up secure user management realtime subscriptions...');
 
-    // Listen for role changes in real-time
+    // Listen for role changes with enhanced security
     const roleChangesChannel = supabase
       .channel(`user-mgmt-role-changes-${Date.now()}`)
       .on(
@@ -93,7 +125,13 @@ const UserManagement = () => {
           table: 'user_roles'
         },
         (payload) => {
-          console.log('Role change detected in user management:', payload);
+          console.log('Secure role change detected in user management:', payload);
+          
+          // Verify admin permissions before processing
+          if (userRole !== 'admin') {
+            console.warn('Non-admin user received role change event, ignoring');
+            return;
+          }
           
           // Debounce the refresh to avoid rapid successive calls
           if (componentMounted.current) {
@@ -115,7 +153,7 @@ const UserManagement = () => {
 
     // Store cleanup function
     realtimeCleanup.current = () => {
-      console.log('Cleaning up user management subscriptions...');
+      console.log('Cleaning up secure user management subscriptions...');
       supabase.removeChannel(roleChangesChannel);
     };
   }, [userRole, currentUser?.id, refreshUserRole]);
@@ -129,7 +167,7 @@ const UserManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching users with admin access...');
+      console.log('Fetching users with enhanced admin access verification...');
       
       if (userRole !== 'admin') {
         throw new Error('Access denied. Admin role required.');
@@ -145,7 +183,7 @@ const UserManagement = () => {
 
       if (!componentMounted.current) return;
 
-      console.log('Users fetched via RPC:', usersWithRoles?.length, usersWithRoles);
+      console.log('Users fetched securely via RPC:', usersWithRoles?.length, usersWithRoles);
 
       const transformedUsers: User[] = usersWithRoles?.map(user => ({
         id: user.id,
@@ -158,7 +196,7 @@ const UserManagement = () => {
         grade: user.grade || undefined
       })) || [];
 
-      console.log('Transformed users:', transformedUsers);
+      console.log('Transformed users securely:', transformedUsers);
       setUsers(transformedUsers);
       
       toast({
@@ -204,21 +242,22 @@ const UserManagement = () => {
     try {
       roleUpdateInProgress.current = true;
       setUpdating(userId);
-      console.log(`Updating role for user ${userId} to ${newRole}`);
+      console.log(`Securely updating role for user ${userId} to ${newRole}`);
       
       if (userRole !== 'admin') {
         throw new Error('Only administrators can update user roles');
       }
 
-      // Use the secure function
+      // Use the new secure function
       const { data, error } = await supabase
-        .rpc('update_user_role', {
+        .rpc('secure_update_user_role', {
           target_user_id: userId,
-          new_role: newRole
+          new_role: newRole,
+          reason: 'Admin role change via user management interface'
         });
 
       if (error) {
-        console.error('Role update error:', error);
+        console.error('Secure role update error:', error);
         throw new Error(`Failed to update role: ${error.message}`);
       }
 
@@ -249,7 +288,7 @@ const UserManagement = () => {
       }, 2000);
       
     } catch (error: any) {
-      console.error('Error updating role:', error);
+      console.error('Error in secure role update:', error);
       
       if (!componentMounted.current) return;
       
@@ -298,9 +337,10 @@ const UserManagement = () => {
       return;
     }
 
-    // Check if it's a critical change that needs confirmation
+    // Enhanced security check for critical changes
     const isCriticalChange = (user.role === 'admin' && newRole !== 'admin') || 
-                           (newRole === 'admin' && user.role !== 'admin');
+                           (newRole === 'admin' && user.role !== 'admin') ||
+                           (userId === currentUser?.id);
 
     if (isCriticalChange) {
       setPendingRoleChange({
@@ -309,11 +349,10 @@ const UserManagement = () => {
         userName: `${user.first_name} ${user.last_name}`
       });
     } else {
-      // For non-critical changes, proceed directly with confirmation
+      // For non-critical changes, still require confirmation
       setPendingRoleChange({ userId, newRole, userName: `${user.first_name} ${user.last_name}` });
-      setTimeout(() => handleRoleChangeConfirm(), 0);
     }
-  }, [users, toast]);
+  }, [users, toast, currentUser?.id]);
 
   const updateUserProfile = async () => {
     if (!editingUser) return;
@@ -323,23 +362,21 @@ const UserManagement = () => {
         throw new Error('Only administrators can update user profiles');
       }
 
-      if (!editingUser.first_name?.trim() || !editingUser.last_name?.trim() || !editingUser.email?.trim()) {
-        throw new Error('First name, last name, and email are required');
-      }
-
-      const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-      if (!emailRegex.test(editingUser.email)) {
-        throw new Error('Please enter a valid email address');
-      }
+      // Validate and sanitize inputs
+      const cleanFirstName = validateInput(editingUser.first_name, 'name');
+      const cleanLastName = validateInput(editingUser.last_name, 'name');
+      const cleanEmail = validateInput(editingUser.email, 'email');
+      const cleanSchool = editingUser.school ? validateInput(editingUser.school, 'text') : null;
+      const cleanGrade = editingUser.grade ? validateInput(editingUser.grade, 'text') : null;
 
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name: editingUser.first_name.trim(),
-          last_name: editingUser.last_name.trim(),
-          email: editingUser.email.trim(),
-          school: editingUser.school?.trim() || null,
-          grade: editingUser.grade?.trim() || null
+          first_name: cleanFirstName,
+          last_name: cleanLastName,
+          email: cleanEmail,
+          school: cleanSchool,
+          grade: cleanGrade
         })
         .eq('id', editingUser.id);
 
@@ -349,7 +386,14 @@ const UserManagement = () => {
       }
 
       setUsers(users.map(user => 
-        user.id === editingUser.id ? editingUser : user
+        user.id === editingUser.id ? {
+          ...editingUser,
+          first_name: cleanFirstName,
+          last_name: cleanLastName,
+          email: cleanEmail,
+          school: cleanSchool || undefined,
+          grade: cleanGrade || undefined
+        } : user
       ));
       
       setEditingUser(null);
@@ -372,6 +416,16 @@ const UserManagement = () => {
         description: errorMessage,
         variant: "destructive"
       });
+    }
+  };
+
+  // Enhanced search with input sanitization
+  const handleSearchChange = (value: string) => {
+    try {
+      const sanitized = validateInput(value, 'text');
+      setSearchTerm(sanitized);
+    } catch (error) {
+      console.warn('Invalid search input, ignoring');
     }
   };
 
@@ -441,7 +495,7 @@ const UserManagement = () => {
             <Shield className="h-5 w-5 text-blue-600" />
             <div className="flex-1">
               <p className="text-sm font-medium text-blue-900">Enhanced Security Active</p>
-              <p className="text-xs text-blue-700">Real-time role synchronization enabled. All actions are logged and validated server-side.</p>
+              <p className="text-xs text-blue-700">Secure real-time role synchronization enabled. All actions are logged and validated server-side with audit trails.</p>
             </div>
             {error && (
               <Button 
@@ -532,10 +586,10 @@ const UserManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-600" />
-            User Management
+            Secure User Management
           </CardTitle>
           <CardDescription>
-            Manage all user accounts and permissions - Showing {filteredUsers.length} of {users.length} users
+            Manage all user accounts and permissions with enhanced security - Showing {filteredUsers.length} of {users.length} users
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -547,7 +601,7 @@ const UserManagement = () => {
                 <Input
                   placeholder="Search users by name or email..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -718,13 +772,13 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Role Change Confirmation Dialog */}
+      {/* Enhanced Role Change Confirmation Dialog */}
       <AlertDialog open={!!pendingRoleChange} onOpenChange={() => setPendingRoleChange(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-600" />
-              Confirm Role Change
+              Confirm Secure Role Change
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRoleChange && (
@@ -732,7 +786,7 @@ const UserManagement = () => {
                   Are you sure you want to change <strong>{pendingRoleChange.userName}</strong>'s role to <strong>{pendingRoleChange.newRole}</strong>?
                   {(pendingRoleChange.newRole === 'admin' || pendingRoleChange.userId === currentUser?.id) && (
                     <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-orange-800 text-sm">
-                      <strong>Warning:</strong> This is a critical role change that will affect system access permissions.
+                      <strong>Warning:</strong> This is a critical role change that will affect system access permissions and be logged in the security audit trail.
                     </div>
                   )}
                 </>
