@@ -8,11 +8,13 @@ import { Link } from "react-router-dom";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import Footer from "@/components/Footer";
+import { useCourseData } from "@/hooks/useCourseData";
 
 const Index = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const { user, userRole, loading } = useAuth();
+  const { courses, loading: coursesLoading } = useCourseData();
 
   const handleSwitchToRegister = () => {
     setShowLogin(false);
@@ -49,6 +51,9 @@ const Index = () => {
         return 'Student Dashboard';
     }
   };
+
+  // Get featured courses (first 3 courses from database)
+  const featuredCourses = courses.slice(0, 3);
 
   const features = [
     {
@@ -209,65 +214,55 @@ const Index = () => {
           <h2 className="text-4xl font-bold text-gray-800 mb-4">Featured Courses</h2>
           <p className="text-xl text-gray-600">Popular courses aligned with Ethiopian curriculum</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {[
-            {
-              title: "Mathematics Grade 12",
-              instructor: "Dr. Meron Asefa",
-              students: "2,400",
-              rating: 4.9,
-              image: "/placeholder.svg",
-              level: "Advanced"
-            },
-            {
-              title: "Ethiopian History",
-              instructor: "Prof. Abebe Kebede",
-              students: "1,800",
-              rating: 4.8,
-              image: "/placeholder.svg",
-              level: "Intermediate"
-            },
-            {
-              title: "English Language Skills",
-              instructor: "Ms. Hanna Tadesse",
-              students: "3,200",
-              rating: 4.7,
-              image: "/placeholder.svg",
-              level: "All Levels"
-            }
-          ].map((course, index) => (
-            <Card key={index} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
-              <div className="relative">
-                <img src={course.image} alt={course.title} className="w-full h-48 object-cover rounded-t-lg" />
-                <Badge className="absolute top-3 left-3 bg-emerald-600 text-white">{course.level}</Badge>
-              </div>
-              <CardHeader>
-                <CardTitle className="text-xl text-gray-800">{course.title}</CardTitle>
-                <CardDescription>by {course.instructor}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                  <span>{course.students} students</span>
-                  <div className="flex items-center">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
-                    {course.rating}
+        
+        {coursesLoading ? (
+          <div className="text-center py-12">
+            <div className="text-xl text-gray-600">Loading courses...</div>
+          </div>
+        ) : featuredCourses.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+              {featuredCourses.map((course) => (
+                <Card key={course.id} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur-sm">
+                  <div className="relative">
+                    <img src={course.image_url || "/placeholder.svg"} alt={course.title} className="w-full h-48 object-cover rounded-t-lg" />
+                    <Badge className="absolute top-3 left-3 bg-emerald-600 text-white">{course.level}</Badge>
                   </div>
-                </div>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700" asChild>
-                  <Link to="/courses">
-                    <Play className="mr-2 h-4 w-4" />
-                    Start Learning
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className="text-center">
-          <Button variant="outline" size="lg" asChild>
-            <Link to="/courses">View All Courses</Link>
-          </Button>
-        </div>
+                  <CardHeader>
+                    <CardTitle className="text-xl text-gray-800">{course.title}</CardTitle>
+                    <CardDescription>by {course.instructor_name}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                      <span>{course.student_count.toLocaleString()} students</span>
+                      <div className="flex items-center">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 mr-1" />
+                        {course.rating}
+                      </div>
+                    </div>
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700" asChild>
+                      <Link to="/courses">
+                        <Play className="mr-2 h-4 w-4" />
+                        Start Learning
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="text-center">
+              <Button variant="outline" size="lg" asChild>
+                <Link to="/courses">View All Courses</Link>
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-12">
+            <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No courses available</h3>
+            <p className="text-gray-500">Check back later for new courses</p>
+          </div>
+        )}
       </section>
 
       {/* Testimonials */}
