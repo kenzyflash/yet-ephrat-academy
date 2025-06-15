@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,35 +45,28 @@ const AdminDashboard = () => {
         supabase.from('course_enrollments').select('id', { count: 'exact' })
       ]);
 
-      // Fetch recent enrollments for actions
+      // Fetch recent enrollments for actions with proper joins
       const { data: enrollmentsData } = await supabase
         .from('course_enrollments')
         .select(`
           id,
           enrolled_at,
           user_id,
-          course_id
+          course_id,
+          courses!inner(title),
+          profiles!inner(email)
         `)
         .order('enrolled_at', { ascending: false })
         .limit(5);
 
-      // Get course titles and user emails for recent actions
-      const recentActionsWithDetails = await Promise.all(
-        (enrollmentsData || []).map(async (enrollment) => {
-          const [courseResult, profileResult] = await Promise.all([
-            supabase.from('courses').select('title').eq('id', enrollment.course_id).single(),
-            supabase.from('profiles').select('email').eq('id', enrollment.user_id).single()
-          ]);
-
-          return {
-            id: enrollment.id,
-            type: 'enrollment',
-            description: `User enrolled in ${courseResult.data?.title || 'Unknown Course'}`,
-            timestamp: enrollment.enrolled_at,
-            user_email: profileResult.data?.email || 'Unknown User'
-          };
-        })
-      );
+      // Process recent actions
+      const recentActionsWithDetails = (enrollmentsData || []).map((enrollment: any) => ({
+        id: enrollment.id,
+        type: 'enrollment',
+        description: `User enrolled in ${enrollment.courses?.title || 'Unknown Course'}`,
+        timestamp: enrollment.enrolled_at,
+        user_email: enrollment.profiles?.email || 'Unknown User'
+      }));
 
       setStats({
         totalUsers: usersResponse.count || 0,

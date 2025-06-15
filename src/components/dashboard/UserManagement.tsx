@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,13 +28,20 @@ export const UserManagement = () => {
       setLoading(true);
       console.log('Fetching users...');
       
-      // Fetch profiles with roles from user_roles table
-      const { data: profiles, error: profilesError } = await supabase
+      // Fetch profiles with roles from user_roles table using proper joins
+      const { data: usersData, error } = await supabase
         .from('profiles')
-        .select('id, email, first_name, last_name, created_at');
+        .select(`
+          id,
+          email,
+          first_name,
+          last_name,
+          created_at,
+          user_roles(role)
+        `);
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
+      if (error) {
+        console.error('Error fetching users:', error);
         toast({
           title: "Error",
           description: "Failed to fetch users. Please try again.",
@@ -42,23 +50,11 @@ export const UserManagement = () => {
         return;
       }
 
-      // Fetch user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-      }
-
-      // Combine profiles with roles
-      const usersWithRoles = (profiles || []).map(profile => {
-        const userRole = (userRoles || []).find(role => role.user_id === profile.id);
-        return {
-          ...profile,
-          role: userRole?.role || 'student'
-        };
-      });
+      // Process the data to include roles
+      const usersWithRoles = (usersData || []).map(user => ({
+        ...user,
+        role: (user as any).user_roles?.[0]?.role || 'student'
+      }));
 
       console.log('Users fetched successfully:', usersWithRoles.length);
       setUsers(usersWithRoles);
