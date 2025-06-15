@@ -56,19 +56,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Fetch user role from the database
+  // Fetch user role from the database with improved error handling
   const fetchUserRole = async (userId: string): Promise<string> => {
     try {
       console.log('Fetching role for user:', userId);
+      
+      // Use maybeSingle() to handle cases where no role exists
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching user role:', error);
-        // Default to student role if no role found
+        
+        // Check if it's a permission error due to RLS
+        if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
+          console.log('Permission denied for role fetch, defaulting to student');
+          setUserRole('student');
+          return 'student';
+        }
+        
+        // For other errors, also default to student
+        console.log('Role fetch failed, defaulting to student');
         setUserRole('student');
         return 'student';
       }
@@ -213,12 +224,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       cleanupAuthState();
       
-      // Determine role based on email or explicit role
+      // Enhanced role determination with validation
       let role: 'student' | 'teacher' | 'admin' = 'student';
-      if (email.includes('admin') || userData.role === 'admin') {
+      
+      // Check email patterns more strictly
+      if (email.toLowerCase().includes('admin@') || userData.role === 'admin') {
         role = 'admin';
-      } else if (email.includes('teacher') || userData.role === 'teacher') {
+      } else if (email.toLowerCase().includes('teacher@') || userData.role === 'teacher') {
         role = 'teacher';
+      }
+
+      // Validate required fields
+      if (!userData.first_name?.trim() || !userData.last_name?.trim()) {
+        throw new Error('First name and last name are required');
       }
 
       const { error } = await supabase.auth.signUp({
@@ -226,7 +244,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
         options: {
           data: {
-            ...userData,
+            first_name: userData.first_name.trim(),
+            last_name: userData.last_name.trim(),
+            school: userData.school?.trim() || '',
+            grade: userData.grade?.trim() || '',
             role: role
           },
           emailRedirectTo: `${window.location.origin}/`
@@ -240,9 +261,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "Please check your email to verify your account.",
       });
     } catch (error: any) {
+      console.error('Sign up error:', error);
+      
+      let errorMessage = error.message;
+      if (error.message?.includes('User already registered')) {
+        errorMessage = 'An account with this email already exists. Please try signing in instead.';
+      } else if (error.message?.includes('Password')) {
+        errorMessage = 'Password must be at least 6 characters long.';
+      } else if (error.message?.includes('Email')) {
+        errorMessage = 'Please enter a valid email address.';
+      }
+      
       toast({
         title: "Sign up failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
       throw error;
@@ -253,8 +285,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       cleanupAuthState();
       
+      if (!email?.trim() || !password?.trim()) {
+        throw new Error('Email and password are required');
+      }
+      
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password
       });
 
@@ -265,9 +301,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "You have been logged in successfully.",
       });
     } catch (error: any) {
+      console.error('Sign in error:', error);
+      
+      let errorMessage = error.message;
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email and click the confirmation link before signing in.';
+      } else if (error.message?.includes('Too many requests')) {
+        errorMessage = 'Too many login attempts. Please wait a moment before trying again.';
+      }
+      
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
       throw error;

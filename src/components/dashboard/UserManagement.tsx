@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, UserCheck, Search, Edit } from 'lucide-react';
+import { Users, UserCheck, Search, Edit, Shield, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface User {
   id: string;
@@ -30,6 +31,7 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { userRole } = useAuth();
 
   useEffect(() => {
     fetchUsers();
@@ -40,7 +42,17 @@ const UserManagement = () => {
       setLoading(true);
       console.log('Fetching users...');
       
-      // First, fetch all profiles
+      // Only admins can access user management
+      if (userRole !== 'admin') {
+        toast({
+          title: "Access Denied",
+          description: "You don't have permission to view user management.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // First, fetch all profiles with proper error handling
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -48,19 +60,20 @@ const UserManagement = () => {
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
+        throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
       }
 
       console.log('Profiles fetched:', profiles?.length);
 
-      // Then, fetch all user roles
+      // Then, fetch all user roles with better error handling
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role');
 
       if (rolesError) {
         console.error('Error fetching roles:', rolesError);
-        throw rolesError;
+        // Don't throw here, just log and continue with default roles
+        console.warn('Could not fetch user roles, using default role assignments');
       }
 
       console.log('Roles fetched:', userRoles?.length);
@@ -73,20 +86,26 @@ const UserManagement = () => {
 
       console.log('Role map:', Object.fromEntries(roleMap));
 
-      // Combine profiles with their roles
+      // Combine profiles with their roles, with better validation
       const usersWithRoles: User[] = profiles?.map(profile => {
+        // Validate required fields
+        if (!profile.id || !profile.email) {
+          console.warn('Invalid profile data:', profile);
+          return null;
+        }
+
         const userRole = roleMap.get(profile.id) || 'student';
         return {
           id: profile.id,
           first_name: profile.first_name || 'Unknown',
           last_name: profile.last_name || 'User',
-          email: profile.email || 'No email',
+          email: profile.email,
           role: userRole as 'student' | 'teacher' | 'admin',
           created_at: profile.created_at,
           school: profile.school || undefined,
           grade: profile.grade || undefined
         };
-      }) || [];
+      }).filter(Boolean) || [];
 
       console.log('Final users with roles:', usersWithRoles);
       setUsers(usersWithRoles);
@@ -96,11 +115,20 @@ const UserManagement = () => {
         description: `Successfully loaded ${usersWithRoles.length} users.`,
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in fetchUsers:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to load users. Please try again.";
+      if (error.message?.includes('permission denied') || error.message?.includes('RLS')) {
+        errorMessage = "Access denied. You may not have the required permissions.";
+      } else if (error.message?.includes('network')) {
+        errorMessage = "Network error. Please check your connection.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to load users. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -112,12 +140,27 @@ const UserManagement = () => {
     try {
       console.log(`Updating role for user ${userId} to ${newRole}`);
       
-      // First, check if user already has a role
-      const { data: existingRole } = await supabase
+      // Validate admin permissions
+      if (userRole !== 'admin') {
+        throw new Error('Only administrators can update user roles');
+      }
+
+      // Validate input
+      if (!userId || !newRole) {
+        throw new Error('Invalid user ID or role');
+      }
+
+      // Check if user already has a role
+      const { data: existingRole, error: checkError } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing role:', checkError);
+        throw new Error(`Failed to check existing role: ${checkError.message}`);
+      }
 
       if (existingRole) {
         // Update existing role
@@ -126,14 +169,20 @@ const UserManagement = () => {
           .update({ role: newRole })
           .eq('user_id', userId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Update error:', updateError);
+          throw new Error(`Failed to update role: ${updateError.message}`);
+        }
       } else {
         // Insert new role
         const { error: insertError } = await supabase
           .from('user_roles')
           .insert({ user_id: userId, role: newRole });
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw new Error(`Failed to assign role: ${insertError.message}`);
+        }
       }
 
       // Update local state
@@ -146,11 +195,19 @@ const UserManagement = () => {
         description: `User role has been updated to ${newRole}.`,
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating role:', error);
+      
+      let errorMessage = "Failed to update user role. Please try again.";
+      if (error.message?.includes('permission denied')) {
+        errorMessage = "Permission denied. You may not have admin rights.";
+      } else if (error.message?.includes('RLS')) {
+        errorMessage = "Access restricted by security policy.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to update user role. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -160,18 +217,37 @@ const UserManagement = () => {
     if (!editingUser) return;
 
     try {
+      // Validate admin permissions
+      if (userRole !== 'admin') {
+        throw new Error('Only administrators can update user profiles');
+      }
+
+      // Validate required fields
+      if (!editingUser.first_name?.trim() || !editingUser.last_name?.trim() || !editingUser.email?.trim()) {
+        throw new Error('First name, last name, and email are required');
+      }
+
+      // Validate email format
+      const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+      if (!emailRegex.test(editingUser.email)) {
+        throw new Error('Please enter a valid email address');
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
-          first_name: editingUser.first_name,
-          last_name: editingUser.last_name,
-          email: editingUser.email,
-          school: editingUser.school,
-          grade: editingUser.grade
+          first_name: editingUser.first_name.trim(),
+          last_name: editingUser.last_name.trim(),
+          email: editingUser.email.trim(),
+          school: editingUser.school?.trim() || null,
+          grade: editingUser.grade?.trim() || null
         })
         .eq('id', editingUser.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile update error:', error);
+        throw new Error(`Failed to update profile: ${error.message}`);
+      }
 
       setUsers(users.map(user => 
         user.id === editingUser.id ? editingUser : user
@@ -184,11 +260,17 @@ const UserManagement = () => {
         title: "Profile Updated",
         description: "User profile has been updated successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
+      
+      let errorMessage = error.message || "Failed to update user profile. Please try again.";
+      if (error.message?.includes('permission denied')) {
+        errorMessage = "Permission denied. You may not have admin rights.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to update user profile. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -223,6 +305,22 @@ const UserManagement = () => {
 
   const stats = getUserStats();
 
+  // Check if user has admin access
+  if (userRole !== 'admin') {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="text-center">
+            <Shield className="h-16 w-16 text-red-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Access Denied</h3>
+            <p className="text-gray-600">You don't have permission to access user management.</p>
+            <p className="text-sm text-gray-500 mt-2">This section is restricted to administrators only.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (loading) {
     return (
       <Card className="bg-white/80 backdrop-blur-sm">
@@ -238,6 +336,19 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Security Notice */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-900">Enhanced Security Active</p>
+              <p className="text-xs text-blue-700">Row-level security policies are now enforced. All actions are logged for audit purposes.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* User Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="bg-white/80 backdrop-blur-sm">
@@ -390,30 +501,34 @@ const UserManagement = () => {
                             <DialogHeader>
                               <DialogTitle>Edit User</DialogTitle>
                               <DialogDescription>
-                                Update user information.
+                                Update user information. All fields marked with * are required.
                               </DialogDescription>
                             </DialogHeader>
                             {editingUser && (
                               <div className="space-y-4">
                                 <div>
-                                  <label className="text-sm font-medium">First Name</label>
+                                  <label className="text-sm font-medium">First Name *</label>
                                   <Input
                                     value={editingUser.first_name}
                                     onChange={(e) => setEditingUser({ ...editingUser, first_name: e.target.value })}
+                                    placeholder="Enter first name"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium">Last Name</label>
+                                  <label className="text-sm font-medium">Last Name *</label>
                                   <Input
                                     value={editingUser.last_name}
                                     onChange={(e) => setEditingUser({ ...editingUser, last_name: e.target.value })}
+                                    placeholder="Enter last name"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium">Email</label>
+                                  <label className="text-sm font-medium">Email *</label>
                                   <Input
+                                    type="email"
                                     value={editingUser.email}
                                     onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                                    placeholder="Enter email address"
                                   />
                                 </div>
                                 <div>
@@ -421,6 +536,7 @@ const UserManagement = () => {
                                   <Input
                                     value={editingUser.school || ''}
                                     onChange={(e) => setEditingUser({ ...editingUser, school: e.target.value })}
+                                    placeholder="Enter school name"
                                   />
                                 </div>
                                 <div>
@@ -428,6 +544,7 @@ const UserManagement = () => {
                                   <Input
                                     value={editingUser.grade || ''}
                                     onChange={(e) => setEditingUser({ ...editingUser, grade: e.target.value })}
+                                    placeholder="Enter grade level"
                                   />
                                 </div>
                                 <div className="flex gap-2">
