@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchUserRole = async (userId: string) => {
     try {
+      console.log('Fetching role for user:', userId);
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
@@ -32,9 +33,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (error) {
         console.error('Error fetching user role:', error);
-        return 'student'; // Default role
+        // If no role found, default to student
+        if (error.code === 'PGRST116') {
+          console.log('No role found, defaulting to student');
+          return 'student';
+        }
+        return 'student';
       }
       
+      console.log('User role fetched:', data?.role);
       return data?.role || 'student';
     } catch (error) {
       console.error('Error in fetchUserRole:', error);
@@ -44,6 +51,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -65,11 +73,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Sign in error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string, userData?: any) => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -95,22 +106,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Sign up error:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const refreshUser = async () => {
     try {
+      setLoading(true);
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       setUser(currentUser);
       
       if (currentUser) {
         const role = await fetchUserRole(currentUser.id);
         setUserRole(role);
+        console.log('User refreshed with role:', role);
       } else {
         setUserRole(null);
       }
     } catch (error) {
       console.error('Error refreshing user:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -119,6 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
+        setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         
         if (mounted) {
@@ -128,12 +146,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const role = await fetchUserRole(session.user.id);
             if (mounted) {
               setUserRole(role);
+              console.log('Initial auth setup complete. User role:', role);
             }
+          } else {
+            setUserRole(null);
           }
-          setLoading(false);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+      } finally {
         if (mounted) {
           setLoading(false);
         }
@@ -145,20 +166,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, session?.user?.email);
       
       setUser(session?.user || null);
       
       if (session?.user) {
+        setLoading(true);
         const role = await fetchUserRole(session.user.id);
         if (mounted) {
           setUserRole(role);
+          console.log('Auth state change complete. User role:', role);
         }
+        setLoading(false);
       } else {
         setUserRole(null);
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return () => {
@@ -169,6 +192,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      setLoading(true);
       await supabase.auth.signOut();
       setUser(null);
       setUserRole(null);
@@ -183,6 +207,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         description: "Failed to sign out",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 

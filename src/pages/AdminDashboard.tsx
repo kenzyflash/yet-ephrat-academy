@@ -25,7 +25,7 @@ interface RecentAction {
 }
 
 const AdminDashboard = () => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalCourses: 0,
@@ -33,8 +33,13 @@ const AdminDashboard = () => {
     activeUsers: 0
   });
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Add debugging
+  useEffect(() => {
+    console.log('AdminDashboard render - user:', user?.email, 'userRole:', userRole, 'loading:', loading);
+  }, [user, userRole, loading]);
 
   const fetchDashboardData = async () => {
     try {
@@ -79,16 +84,51 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
-      setLoading(false);
+      setDashboardLoading(false);
     }
   };
 
   useEffect(() => {
     if (user && userRole === 'admin') {
       fetchDashboardData();
+    } else if (!loading) {
+      setDashboardLoading(false);
     }
-  }, [user, userRole]);
+  }, [user, userRole, loading]);
 
+  // Show loading while auth is initializing
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Loading...</CardTitle>
+            <CardDescription className="text-center">
+              Checking your permissions...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Check if user is not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Not Authenticated</CardTitle>
+            <CardDescription className="text-center">
+              Please log in to access the admin dashboard.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Check if user doesn't have admin role
   if (userRole !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -97,6 +137,11 @@ const AdminDashboard = () => {
             <CardTitle className="text-center text-red-600">Access Denied</CardTitle>
             <CardDescription className="text-center">
               You don't have permission to access the admin dashboard.
+              <br />
+              <br />
+              Current role: {userRole || 'No role assigned'}
+              <br />
+              User: {user.email}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -116,6 +161,9 @@ const AdminDashboard = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">Manage your platform and monitor system activity</p>
+          <p className="text-sm text-gray-500 mt-2">
+            Welcome, {user.email} (Role: {userRole})
+          </p>
         </div>
 
         {/* System Overview */}
