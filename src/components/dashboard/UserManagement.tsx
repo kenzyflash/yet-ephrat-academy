@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Users, UserCheck, Search, Edit, Shield, AlertTriangle, Loader2 } from 'lucide-react';
+import { Users, UserCheck, Search, Edit, Shield, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,18 +40,51 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [pendingRoleChange, setPendingRoleChange] = useState<{userId: string, newRole: string, userName: string} | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { userRole, user: currentUser, refreshUserRole } = useAuth();
+  
+  // Refs to prevent multiple concurrent operations
+  const roleUpdateInProgress = useRef(false);
+  const componentMounted = useRef(true);
+  const realtimeCleanup = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    fetchUsers();
-    setupRealtimeSubscriptions();
-  }, []);
+    componentMounted.current = true;
+    if (userRole === 'admin') {
+      initializeUserManagement();
+    }
+    
+    return () => {
+      componentMounted.current = false;
+      if (realtimeCleanup.current) {
+        realtimeCleanup.current();
+      }
+    };
+  }, [userRole]);
 
-  const setupRealtimeSubscriptions = () => {
+  const initializeUserManagement = async () => {
+    try {
+      await fetchUsers();
+      setupRealtimeSubscriptions();
+    } catch (error) {
+      console.error('Error initializing user management:', error);
+    }
+  };
+
+  const setupRealtimeSubscriptions = useCallback(() => {
+    if (userRole !== 'admin') return;
+
+    // Clean up existing subscription
+    if (realtimeCleanup.current) {
+      realtimeCleanup.current();
+    }
+
+    console.log('Setting up user management realtime subscriptions...');
+
     // Listen for role changes in real-time
     const roleChangesChannel = supabase
-      .channel('user-role-changes')
+      .channel(`user-mgmt-role-changes-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -60,9 +93,16 @@ const UserManagement = () => {
           table: 'user_roles'
         },
         (payload) => {
-          console.log('Role change detected:', payload);
-          // Refresh the user list when roles change
-          fetchUsers();
+          console.log('Role change detected in user management:', payload);
+          
+          // Debounce the refresh to avoid rapid successive calls
+          if (componentMounted.current) {
+            setTimeout(() => {
+              if (componentMounted.current) {
+                fetchUsers();
+              }
+            }, 1000);
+          }
           
           // If the current user's role changed, refresh their session
           if ((payload.new && typeof payload.new === 'object' && 'user_id' in payload.new && payload.new.user_id === currentUser?.id) || 
@@ -73,23 +113,26 @@ const UserManagement = () => {
       )
       .subscribe();
 
-    return () => {
+    // Store cleanup function
+    realtimeCleanup.current = () => {
+      console.log('Cleaning up user management subscriptions...');
       supabase.removeChannel(roleChangesChannel);
     };
-  };
+  }, [userRole, currentUser?.id, refreshUserRole]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    if (roleUpdateInProgress.current) {
+      console.log('Role update in progress, skipping user fetch...');
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(null);
       console.log('Fetching users with admin access...');
       
       if (userRole !== 'admin') {
-        toast({
-          title: "Access Denied",
-          description: "You don't have permission to view user management.",
-          variant: "destructive"
-        });
-        return;
+        throw new Error('Access denied. Admin role required.');
       }
 
       const { data: usersWithRoles, error } = await supabase
@@ -99,6 +142,8 @@ const UserManagement = () => {
         console.error('Error fetching users via RPC:', error);
         throw new Error(`Failed to fetch users: ${error.message}`);
       }
+
+      if (!componentMounted.current) return;
 
       console.log('Users fetched via RPC:', usersWithRoles?.length, usersWithRoles);
 
@@ -124,6 +169,8 @@ const UserManagement = () => {
     } catch (error: any) {
       console.error('Error in fetchUsers:', error);
       
+      if (!componentMounted.current) return;
+      
       let errorMessage = "Failed to load users. Please try again.";
       if (error.message?.includes('Access denied')) {
         errorMessage = "Access denied. You may not have the required admin permissions.";
@@ -133,22 +180,29 @@ const UserManagement = () => {
         errorMessage = "Network error. Please check your connection.";
       }
       
+      setError(errorMessage);
       toast({
         title: "Error",
         description: errorMessage,
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      if (componentMounted.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [userRole, toast]);
 
   const handleRoleChangeConfirm = async () => {
-    if (!pendingRoleChange) return;
+    if (!pendingRoleChange || roleUpdateInProgress.current) {
+      console.log('Role update already in progress or no pending change');
+      return;
+    }
 
     const { userId, newRole } = pendingRoleChange;
     
     try {
+      roleUpdateInProgress.current = true;
       setUpdating(userId);
       console.log(`Updating role for user ${userId} to ${newRole}`);
       
@@ -156,7 +210,7 @@ const UserManagement = () => {
         throw new Error('Only administrators can update user roles');
       }
 
-      // Use the new secure function
+      // Use the secure function
       const { data, error } = await supabase
         .rpc('update_user_role', {
           target_user_id: userId,
@@ -175,8 +229,10 @@ const UserManagement = () => {
         throw new Error(response.error || 'Failed to update role');
       }
 
+      if (!componentMounted.current) return;
+
       // Update local state immediately for better UX
-      setUsers(users.map(user => 
+      setUsers(prevUsers => prevUsers.map(user => 
         user.id === userId ? { ...user, role: newRole as any } : user
       ));
       
@@ -185,13 +241,17 @@ const UserManagement = () => {
         description: response.message || `User role has been updated to ${newRole}.`,
       });
       
-      // Refresh the user list to ensure consistency
+      // Refresh the user list after a delay to ensure consistency
       setTimeout(() => {
-        fetchUsers();
-      }, 1000);
+        if (componentMounted.current) {
+          fetchUsers();
+        }
+      }, 2000);
       
     } catch (error: any) {
       console.error('Error updating role:', error);
+      
+      if (!componentMounted.current) return;
       
       let errorMessage = "Failed to update user role. Please try again.";
       if (error.message?.includes('permission denied')) {
@@ -200,6 +260,8 @@ const UserManagement = () => {
         errorMessage = "You cannot remove your own admin privileges.";
       } else if (error.message?.includes('Access denied')) {
         errorMessage = "Access denied. Admin role required.";
+      } else if (error.message?.includes('already in progress')) {
+        errorMessage = "Role update already in progress. Please wait.";
       }
       
       toast({
@@ -208,14 +270,33 @@ const UserManagement = () => {
         variant: "destructive"
       });
     } finally {
+      roleUpdateInProgress.current = false;
       setUpdating(null);
       setPendingRoleChange(null);
     }
   };
 
-  const initiateRoleChange = (userId: string, newRole: string) => {
+  const initiateRoleChange = useCallback((userId: string, newRole: string) => {
+    if (roleUpdateInProgress.current) {
+      toast({
+        title: "Please wait",
+        description: "Another role update is in progress.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const user = users.find(u => u.id === userId);
     if (!user) return;
+
+    // Don't allow changes if already the same role
+    if (user.role === newRole) {
+      toast({
+        title: "No change needed",
+        description: "User already has this role.",
+      });
+      return;
+    }
 
     // Check if it's a critical change that needs confirmation
     const isCriticalChange = (user.role === 'admin' && newRole !== 'admin') || 
@@ -228,11 +309,11 @@ const UserManagement = () => {
         userName: `${user.first_name} ${user.last_name}`
       });
     } else {
-      // For non-critical changes, proceed directly
+      // For non-critical changes, proceed directly with confirmation
       setPendingRoleChange({ userId, newRole, userName: `${user.first_name} ${user.last_name}` });
       setTimeout(() => handleRoleChangeConfirm(), 0);
     }
-  };
+  }, [users, toast]);
 
   const updateUserProfile = async () => {
     if (!editingUser) return;
@@ -353,18 +434,56 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Security Notice */}
+      {/* Enhanced Security Notice */}
       <Card className="bg-blue-50 border-blue-200">
         <CardContent className="p-4">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-blue-600" />
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium text-blue-900">Enhanced Security Active</p>
               <p className="text-xs text-blue-700">Real-time role synchronization enabled. All actions are logged and validated server-side.</p>
             </div>
+            {error && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  fetchUsers();
+                }}
+                className="ml-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Error Display */}
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-900">Error Loading Data</p>
+                <p className="text-xs text-red-700">{error}</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  fetchUsers();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* User Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -444,8 +563,12 @@ const UserManagement = () => {
                 <SelectItem value="admin">Admins</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={fetchUsers} variant="outline" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Refresh'}
+            <Button 
+              onClick={fetchUsers} 
+              variant="outline" 
+              disabled={loading || roleUpdateInProgress.current}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -494,7 +617,7 @@ const UserManagement = () => {
                         <Select
                           value={user.role}
                           onValueChange={(value) => initiateRoleChange(user.id, value)}
-                          disabled={updating === user.id}
+                          disabled={updating === user.id || roleUpdateInProgress.current}
                         >
                           <SelectTrigger className="w-32">
                             {updating === user.id ? (
@@ -518,7 +641,7 @@ const UserManagement = () => {
                               variant="outline" 
                               size="sm"
                               onClick={() => setEditingUser(user)}
-                              disabled={updating === user.id}
+                              disabled={updating === user.id || roleUpdateInProgress.current}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -617,9 +740,20 @@ const UserManagement = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRoleChangeConfirm} className="bg-emerald-600 hover:bg-emerald-700">
-              Confirm Change
+            <AlertDialogCancel disabled={roleUpdateInProgress.current}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRoleChangeConfirm} 
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={roleUpdateInProgress.current}
+            >
+              {roleUpdateInProgress.current ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Updating...</span>
+                </div>
+              ) : (
+                'Confirm Change'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

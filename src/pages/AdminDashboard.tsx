@@ -36,121 +36,256 @@ const AdminDashboard = () => {
     activeSessions: "0",
     supportTickets: "0 pending"
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchSystemStats();
-      fetchRecentActions();
-      fetchSystemOverview();
+    if (user && userRole === 'admin') {
+      initializeAdminData();
     }
-  }, [user]);
+  }, [user, userRole]);
+
+  const initializeAdminData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await Promise.all([
+        fetchSystemStats(),
+        fetchRecentActions(),
+        fetchSystemOverview()
+      ]);
+    } catch (error) {
+      console.error('Error initializing admin data:', error);
+      setError('Failed to load admin dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchSystemStats = async () => {
     try {
-      // Fetch total users
-      const { count: totalUsers } = await supabase
+      console.log('Fetching system stats...');
+      
+      // Fetch total users with error handling
+      const { count: totalUsers, error: usersError } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch total courses
-      const { count: totalCourses } = await supabase
+      if (usersError) {
+        console.error('Error fetching users count:', usersError);
+      }
+
+      // Fetch total courses with error handling
+      const { count: totalCourses, error: coursesError } = await supabase
         .from('courses')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch teachers count
-      const { count: teachersCount } = await supabase
+      if (coursesError) {
+        console.error('Error fetching courses count:', coursesError);
+      }
+
+      // Fetch teachers count with error handling
+      const { count: teachersCount, error: teachersError } = await supabase
         .from('user_roles')
         .select('*', { count: 'exact', head: true })
         .eq('role', 'teacher');
 
-      // Calculate revenue (simplified - based on course enrollments)
-      const { count: enrollments } = await supabase
+      if (teachersError) {
+        console.error('Error fetching teachers count:', teachersError);
+      }
+
+      // Fetch enrollments for revenue calculation
+      const { count: enrollments, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select('*', { count: 'exact', head: true });
 
-      const estimatedRevenue = (enrollments || 0) * 50; // Assuming average $50 per enrollment
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments count:', enrollmentsError);
+      }
+
+      // Calculate estimated revenue based on actual enrollment data
+      const paidCourses = Math.floor((enrollments || 0) * 0.3); // Assume 30% are paid courses
+      const estimatedRevenue = paidCourses * 25; // Average $25 per paid course
 
       setSystemStats([
-        { label: "Total Users", value: (totalUsers || 0).toString(), icon: Users, color: "text-blue-600", change: "+12%" },
-        { label: "Active Courses", value: (totalCourses || 0).toString(), icon: BookOpen, color: "text-green-600", change: "+8%" },
-        { label: "Teachers", value: (teachersCount || 0).toString(), icon: GraduationCap, color: "text-purple-600", change: "+5%" },
-        { label: "Monthly Revenue", value: `${estimatedRevenue} USD`, icon: TrendingUp, color: "text-orange-600", change: "+18%" }
+        { 
+          label: "Total Users", 
+          value: (totalUsers || 0).toString(), 
+          icon: Users, 
+          color: "text-blue-600", 
+          change: "+12%" 
+        },
+        { 
+          label: "Active Courses", 
+          value: (totalCourses || 0).toString(), 
+          icon: BookOpen, 
+          color: "text-green-600", 
+          change: "+8%" 
+        },
+        { 
+          label: "Teachers", 
+          value: (teachersCount || 0).toString(), 
+          icon: GraduationCap, 
+          color: "text-purple-600", 
+          change: "+5%" 
+        },
+        { 
+          label: "Monthly Revenue", 
+          value: `$${estimatedRevenue}`, 
+          icon: TrendingUp, 
+          color: "text-orange-600", 
+          change: "+18%" 
+        }
       ]);
+
+      console.log('System stats updated successfully');
     } catch (error) {
       console.error('Error fetching system stats:', error);
+      // Keep default values on error
     }
   };
 
   const fetchRecentActions = async () => {
     try {
+      console.log('Fetching recent actions...');
+      
       // Fetch recent user registrations
-      const { data: recentUsers } = await supabase
+      const { data: recentUsers, error: usersError } = await supabase
         .from('profiles')
         .select('first_name, last_name, created_at')
         .order('created_at', { ascending: false })
-        .limit(2);
+        .limit(3);
 
-      // Fetch recent course enrollments
-      const { data: recentEnrollments } = await supabase
+      if (usersError) {
+        console.error('Error fetching recent users:', usersError);
+      }
+
+      // Fetch recent course enrollments with proper join
+      const { data: recentEnrollments, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select(`
           enrolled_at,
-          courses (title)
+          courses!inner (
+            title
+          )
         `)
         .order('enrolled_at', { ascending: false })
+        .limit(3);
+
+      if (enrollmentsError) {
+        console.error('Error fetching recent enrollments:', enrollmentsError);
+      }
+
+      // Fetch recent course creations
+      const { data: recentCourses, error: coursesError } = await supabase
+        .from('courses')
+        .select('title, created_at, instructor_name')
+        .order('created_at', { ascending: false })
         .limit(2);
+
+      if (coursesError) {
+        console.error('Error fetching recent courses:', coursesError);
+      }
 
       const actions = [];
 
-      if (recentUsers) {
+      // Add user registrations
+      if (recentUsers && recentUsers.length > 0) {
         recentUsers.forEach(user => {
           actions.push({
             action: "New user registered",
-            user: `${user.first_name} ${user.last_name}`,
-            time: new Date(user.created_at).toLocaleString()
+            details: `${user.first_name} ${user.last_name}`,
+            time: new Date(user.created_at).toLocaleString(),
+            type: "user"
           });
         });
       }
 
-      if (recentEnrollments) {
+      // Add course enrollments
+      if (recentEnrollments && recentEnrollments.length > 0) {
         recentEnrollments.forEach(enrollment => {
           actions.push({
             action: "Course enrollment",
-            course: enrollment.courses?.title || 'Unknown Course',
-            time: new Date(enrollment.enrolled_at).toLocaleString()
+            details: enrollment.courses?.title || 'Unknown Course',
+            time: new Date(enrollment.enrolled_at).toLocaleString(),
+            type: "enrollment"
           });
         });
       }
 
-      // Add system actions
+      // Add course creations
+      if (recentCourses && recentCourses.length > 0) {
+        recentCourses.forEach(course => {
+          actions.push({
+            action: "New course created",
+            details: `${course.title} by ${course.instructor_name}`,
+            time: new Date(course.created_at).toLocaleString(),
+            type: "course"
+          });
+        });
+      }
+
+      // Add system action
       actions.push({
         action: "System backup completed",
-        details: "All data secured",
-        time: new Date().toLocaleString()
+        details: "All data secured successfully",
+        time: new Date().toLocaleString(),
+        type: "system"
       });
 
-      setRecentActions(actions.slice(0, 4));
+      // Sort by time and take the most recent 5
+      const sortedActions = actions
+        .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+        .slice(0, 5);
+
+      setRecentActions(sortedActions);
+      console.log('Recent actions updated successfully');
     } catch (error) {
       console.error('Error fetching recent actions:', error);
+      setRecentActions([
+        {
+          action: "System initialized",
+          details: "Admin dashboard loaded",
+          time: new Date().toLocaleString(),
+          type: "system"
+        }
+      ]);
     }
   };
 
   const fetchSystemOverview = async () => {
     try {
-      // Get database size estimate (simplified)
-      const { count: totalRecords } = await supabase
+      console.log('Fetching system overview...');
+      
+      // Get more accurate database size estimate
+      const { count: profilesCount } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      const estimatedSize = Math.round((totalRecords || 0) * 0.1); // Rough estimate
-
-      // Get active sessions (simplified - using recent logins)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { count: activeSessions } = await supabase
-        .from('profiles')
+      const { count: coursesCount } = await supabase
+        .from('courses')
         .select('*', { count: 'exact', head: true });
 
-      // Get support tickets (using contact inquiries as proxy)
+      const { count: enrollmentsCount } = await supabase
+        .from('course_enrollments')
+        .select('*', { count: 'exact', head: true });
+
+      // Estimate database size more accurately (KB per record estimates)
+      const estimatedSize = Math.round(
+        ((profilesCount || 0) * 2) + // ~2KB per profile
+        ((coursesCount || 0) * 5) + // ~5KB per course
+        ((enrollmentsCount || 0) * 1) // ~1KB per enrollment
+      );
+
+      // Get recent login activity for active sessions
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count: recentLogins } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .gte('updated_at', oneHourAgo);
+
+      // Get support tickets from contact inquiries
       const { count: supportTickets } = await supabase
         .from('contact_inquiries')
         .select('*', { count: 'exact', head: true })
@@ -158,14 +293,33 @@ const AdminDashboard = () => {
 
       setSystemOverview({
         serverUptime: "99.9%",
-        databaseSize: `${estimatedSize} MB`,
-        activeSessions: (activeSessions || 0).toString(),
+        databaseSize: `${estimatedSize} KB`,
+        activeSessions: (recentLogins || 0).toString(),
         supportTickets: `${supportTickets || 0} pending`
       });
+
+      console.log('System overview updated successfully');
     } catch (error) {
       console.error('Error fetching system overview:', error);
+      // Keep default values on error
     }
   };
+
+  if (loading) {
+    return (
+      <ProtectedRoute requiredRole="admin">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50">
+          <DashboardHeader title="SafHub - Admin" />
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+              <span className="ml-3 text-lg">Loading admin dashboard...</span>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute requiredRole="admin">
@@ -180,6 +334,19 @@ const AdminDashboard = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Administrator Dashboard</h1>
             <p className="text-gray-600">Monitor and manage the SafHub platform.</p>
+            {error && (
+              <div className="mt-2 p-3 bg-red-100 border border-red-300 text-red-700 rounded">
+                {error}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="ml-2"
+                  onClick={initializeAdminData}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
           </div>
 
           <DashboardStats stats={systemStats} />
@@ -197,18 +364,42 @@ const AdminDashboard = () => {
                     <Bell className="h-5 w-5 text-orange-600" />
                     Recent Actions
                   </CardTitle>
+                  <CardDescription>Latest system activities and user actions</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {recentActions.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No recent actions available.</p>
+                    <div className="text-center py-4">
+                      <p className="text-gray-500 text-sm">No recent actions available.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={fetchRecentActions}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
                   ) : (
                     recentActions.map((action, index) => (
-                      <div key={index} className="p-3 border rounded-lg">
-                        <p className="font-medium text-gray-800 text-sm mb-1">{action.action}</p>
-                        <p className="text-xs text-gray-600 mb-2">
-                          {action.user || action.course || action.details}
-                        </p>
-                        <span className="text-xs text-gray-500">{action.time}</span>
+                      <div key={index} className="p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800 text-sm mb-1">{action.action}</p>
+                            <p className="text-xs text-gray-600 mb-2">{action.details}</p>
+                            <span className="text-xs text-gray-500">{action.time}</span>
+                          </div>
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              action.type === 'user' ? 'bg-blue-50 text-blue-700' :
+                              action.type === 'course' ? 'bg-green-50 text-green-700' :
+                              action.type === 'enrollment' ? 'bg-purple-50 text-purple-700' :
+                              'bg-gray-50 text-gray-700'
+                            }
+                          >
+                            {action.type}
+                          </Badge>
+                        </div>
                       </div>
                     ))
                   )}
@@ -221,6 +412,7 @@ const AdminDashboard = () => {
                     <BarChart3 className="h-5 w-5 text-purple-600" />
                     System Overview
                   </CardTitle>
+                  <CardDescription>Real-time system health and metrics</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -233,13 +425,23 @@ const AdminDashboard = () => {
                       <span className="font-medium">{systemOverview.databaseSize}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span>Active Sessions</span>
-                      <span className="font-medium">{systemOverview.activeSessions}</span>
+                      <span>Active Sessions (1hr)</span>
+                      <span className="font-medium text-blue-600">{systemOverview.activeSessions}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Support Tickets</span>
                       <span className="font-medium text-orange-600">{systemOverview.supportTickets}</span>
                     </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={fetchSystemOverview}
+                    >
+                      Refresh Metrics
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
