@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,29 +58,46 @@ const SubmissionManagement = () => {
     try {
       console.log('Fetching submissions for teacher:', user.id);
 
-      // First, get all assignments for courses taught by this instructor
-      const { data: teacherAssignments, error: assignmentsError } = await supabase
+      // Step 1: Get courses taught by this instructor
+      const { data: teacherCourses, error: coursesError } = await supabase
+        .from('courses')
+        .select('id, title')
+        .eq('instructor_id', user.id);
+
+      if (coursesError) {
+        console.error('Error fetching teacher courses:', coursesError);
+        throw coursesError;
+      }
+
+      if (!teacherCourses || teacherCourses.length === 0) {
+        console.log('No courses found for this teacher');
+        setSubmissions([]);
+        setHasInitiallyLoaded(true);
+        if (showRefreshing) {
+          toast({
+            title: "Refreshed",
+            description: "No courses found",
+          });
+        }
+        return;
+      }
+
+      const courseIds = teacherCourses.map(course => course.id);
+      console.log('Teacher courses:', teacherCourses);
+
+      // Step 2: Get assignments for these courses
+      const { data: assignments, error: assignmentsError } = await supabase
         .from('assignments')
-        .select(`
-          id,
-          title,
-          due_date,
-          course_id,
-          courses!fk_assignments_course_id(
-            id,
-            title,
-            instructor_id
-          )
-        `)
-        .eq('courses.instructor_id', user.id);
+        .select('id, title, course_id, due_date')
+        .in('course_id', courseIds);
 
       if (assignmentsError) {
-        console.error('Error fetching teacher assignments:', assignmentsError);
+        console.error('Error fetching assignments:', assignmentsError);
         throw assignmentsError;
       }
 
-      if (!teacherAssignments || teacherAssignments.length === 0) {
-        console.log('No assignments found for this teacher');
+      if (!assignments || assignments.length === 0) {
+        console.log('No assignments found for teacher courses');
         setSubmissions([]);
         setHasInitiallyLoaded(true);
         if (showRefreshing) {
@@ -91,10 +109,10 @@ const SubmissionManagement = () => {
         return;
       }
 
-      const assignmentIds = teacherAssignments.map(assignment => assignment.id);
-      console.log('Assignment IDs for teacher:', assignmentIds);
+      const assignmentIds = assignments.map(assignment => assignment.id);
+      console.log('Assignments found:', assignments.length);
 
-      // Get all submissions for these assignments
+      // Step 3: Get submissions for these assignments
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
         .select('*')
@@ -105,8 +123,6 @@ const SubmissionManagement = () => {
         console.error('Error fetching submissions:', submissionsError);
         throw submissionsError;
       }
-
-      console.log('Raw submissions data:', submissionsData);
 
       if (!submissionsData || submissionsData.length === 0) {
         console.log('No submissions found');
@@ -121,38 +137,54 @@ const SubmissionManagement = () => {
         return;
       }
 
-      // Get unique user IDs from submissions
-      const userIds = [...new Set(submissionsData.map(sub => sub.user_id))];
-      console.log('User IDs from submissions:', userIds);
+      console.log('Raw submissions found:', submissionsData.length);
 
-      // Fetch student profiles separately
+      // Step 4: Get student profiles for all unique user IDs
+      const uniqueUserIds = [...new Set(submissionsData.map(sub => sub.user_id))];
+      console.log('Unique student IDs:', uniqueUserIds);
+
       const { data: studentProfiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
-        .in('id', userIds);
+        .select('id, first_name, last_name, email')
+        .in('id', uniqueUserIds);
 
       if (profilesError) {
         console.error('Error fetching student profiles:', profilesError);
-        throw profilesError;
+        // Don't throw here, we can still show submissions with fallback names
       }
 
-      console.log('Student profiles:', studentProfiles);
+      console.log('Student profiles fetched:', studentProfiles?.length || 0);
 
-      // Transform the data to match our interface
-      const enrichedSubmissions = submissionsData.map((submission: any) => {
-        const assignment = teacherAssignments.find(a => a.id === submission.assignment_id);
-        const course = assignment?.courses;
+      // Step 5: Combine all data
+      const enrichedSubmissions = submissionsData.map((submission) => {
+        // Find the assignment for this submission
+        const assignment = assignments.find(a => a.id === submission.assignment_id);
+        
+        // Find the course for this assignment
+        const course = teacherCourses.find(c => c.id === assignment?.course_id);
+        
+        // Find the student profile
         const studentProfile = studentProfiles?.find(p => p.id === submission.user_id);
         
-        const studentName = studentProfile 
-          ? `${studentProfile.first_name || ''} ${studentProfile.last_name || ''}`.trim()
-          : 'Unknown Student';
+        // Create student name with fallback logic
+        let studentName = 'Unknown Student';
+        if (studentProfile) {
+          const firstName = studentProfile.first_name || '';
+          const lastName = studentProfile.last_name || '';
+          if (firstName || lastName) {
+            studentName = `${firstName} ${lastName}`.trim();
+          } else if (studentProfile.email) {
+            // Use email as fallback if no name is available
+            studentName = studentProfile.email;
+          }
+        }
 
         console.log(`Processing submission ${submission.id}:`, {
-          assignment_id: submission.assignment_id,
           user_id: submission.user_id,
           studentProfile,
-          studentName
+          studentName,
+          assignment_title: assignment?.title,
+          course_title: course?.title
         });
 
         return {
