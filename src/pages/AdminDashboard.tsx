@@ -21,6 +21,7 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import UserManagement from "@/components/dashboard/UserManagement";
 import ContactManagement from "@/components/dashboard/ContactManagement";
 import AdminSettings from "@/components/dashboard/AdminSettings";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const AdminDashboard = () => {
   const { user, userRole } = useAuth();
@@ -379,47 +380,24 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="mb-6">
-            <div className="flex space-x-1 bg-white/80 backdrop-blur-sm rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'overview' 
-                    ? 'bg-emerald-600 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
+          {/* Replace the custom tab navigation with shadcn Tabs component */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="overview" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'users' 
-                    ? 'bg-emerald-600 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
+              </TabsTrigger>
+              <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Users
-              </button>
-              <button
-                onClick={() => setActiveTab('contact')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                  activeTab === 'contact' 
-                    ? 'bg-emerald-600 text-white' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
+              </TabsTrigger>
+              <TabsTrigger value="contact" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
                 Contact Forms
-              </button>
-            </div>
-          </div>
+              </TabsTrigger>
+            </TabsList>
 
-          {activeTab === 'overview' && (
-            <>
+            <TabsContent value="overview" className="space-y-6">
               <DashboardStats stats={systemStats} />
 
               {/* Main Content */}
@@ -552,11 +530,16 @@ const AdminDashboard = () => {
                   </Card>
                 </div>
               </div>
-            </>
-          )}
+            </TabsContent>
 
-          {activeTab === 'users' && <UserManagement />}
-          {activeTab === 'contact' && <ContactManagement />}
+            <TabsContent value="users">
+              <UserManagement />
+            </TabsContent>
+
+            <TabsContent value="contact">
+              <ContactManagement />
+            </TabsContent>
+          </Tabs>
         </div>
 
         <AdminSettings open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
