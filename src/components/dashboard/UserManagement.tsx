@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +21,14 @@ interface User {
   created_at: string;
   school?: string;
   grade?: string;
+}
+
+interface RoleUpdateResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+  old_role?: string;
+  new_role?: string;
 }
 
 const UserManagement = () => {
@@ -58,7 +65,8 @@ const UserManagement = () => {
           fetchUsers();
           
           // If the current user's role changed, refresh their session
-          if (payload.new?.user_id === currentUser?.id || payload.old?.user_id === currentUser?.id) {
+          if ((payload.new && typeof payload.new === 'object' && 'user_id' in payload.new && payload.new.user_id === currentUser?.id) || 
+              (payload.old && typeof payload.old === 'object' && 'user_id' in payload.old && payload.old.user_id === currentUser?.id)) {
             refreshUserRole();
           }
         }
@@ -160,8 +168,11 @@ const UserManagement = () => {
         throw new Error(`Failed to update role: ${error.message}`);
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update role');
+      // Type guard and parse the response
+      const response = data as RoleUpdateResponse;
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update role');
       }
 
       // Update local state immediately for better UX
@@ -171,7 +182,7 @@ const UserManagement = () => {
       
       toast({
         title: "Role Updated",
-        description: data.message || `User role has been updated to ${newRole}.`,
+        description: response.message || `User role has been updated to ${newRole}.`,
       });
       
       // Refresh the user list to ensure consistency
