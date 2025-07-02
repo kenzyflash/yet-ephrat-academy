@@ -48,8 +48,11 @@ const GamificationPage = () => {
         .select('*')
         .order('category', { ascending: true });
 
-      if (!achievementsError && allAchievements) {
-        setAchievements(allAchievements);
+      if (!achievementsError && allAchievements && Array.isArray(allAchievements)) {
+        setAchievements(allAchievements as Achievement[]);
+      } else {
+        console.log('Achievements table not ready yet');
+        setAchievements([]);
       }
 
       // Fetch user achievements
@@ -61,16 +64,21 @@ const GamificationPage = () => {
         `)
         .eq('user_id', user?.id);
 
-      if (!userAchievementsError && userAchievementData && allAchievements) {
+      if (!userAchievementsError && userAchievementData && Array.isArray(userAchievementData) && Array.isArray(allAchievements)) {
         // Match user achievements with achievement details
         const earnedAchievements = userAchievementData
           .map((userAch: any) => {
-            const achievement = allAchievements.find((ach: any) => ach.id === userAch.achievement_id);
-            return achievement ? { ...achievement, earned_at: userAch.earned_at } : null;
+            if (userAch && typeof userAch === 'object' && 'achievement_id' in userAch) {
+              const achievement = allAchievements.find((ach: any) => ach && typeof ach === 'object' && ach.id === userAch.achievement_id);
+              return achievement ? { ...achievement, earned_at: userAch.earned_at } : null;
+            }
+            return null;
           })
-          .filter(Boolean);
+          .filter(Boolean) as Achievement[];
         
         setUserAchievements(earnedAchievements);
+      } else {
+        setUserAchievements([]);
       }
 
       // Fetch user points
@@ -80,10 +88,10 @@ const GamificationPage = () => {
         .eq('user_id', user?.id)
         .single();
 
-      if (!pointsError && userPoints) {
+      if (!pointsError && userPoints && typeof userPoints === 'object' && 'total_points' in userPoints) {
         setUserStats({
-          totalPoints: userPoints.total_points || 0,
-          level: userPoints.level || 1,
+          totalPoints: (userPoints as any).total_points || 0,
+          level: (userPoints as any).level || 1,
           achievementCount: userAchievements.length
         });
       } else {
@@ -105,6 +113,10 @@ const GamificationPage = () => {
 
     } catch (error) {
       console.error('Error fetching gamification data:', error);
+      // Set default values when database isn't ready
+      setAchievements([]);
+      setUserAchievements([]);
+      setUserStats({ totalPoints: 0, level: 1, achievementCount: 0 });
     } finally {
       setLoading(false);
     }

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,7 +120,7 @@ const StudentDashboard = () => {
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  Welcome back, {user?.first_name}!
+                  Welcome back, Student!
                 </h1>
                 <p className="text-gray-600">Continue your learning journey.</p>
               </div>

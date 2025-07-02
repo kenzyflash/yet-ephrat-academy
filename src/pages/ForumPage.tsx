@@ -52,10 +52,10 @@ const ForumPage = () => {
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setForums(data);
+      if (!error && data && Array.isArray(data)) {
+        setForums(data as Forum[]);
       } else {
-        console.error('Error fetching forums:', error);
+        console.log('Forums table not ready yet');
         // Show some default forums if database not ready
         setForums([]);
       }

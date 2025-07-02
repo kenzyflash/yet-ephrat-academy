@@ -51,9 +51,9 @@ export const useGamification = () => {
         .eq('user_id', user.id)
         .single();
       
-      if (pointsData && !pointsError) {
-        setUserPoints(pointsData.total_points || 0);
-        setUserLevel(pointsData.level || 1);
+      if (pointsData && !pointsError && typeof pointsData === 'object' && 'total_points' in pointsData) {
+        setUserPoints((pointsData as any).total_points || 0);
+        setUserLevel((pointsData as any).level || 1);
         return;
       }
 
@@ -74,6 +74,9 @@ export const useGamification = () => {
       }
     } catch (error) {
       console.error('Error fetching user points:', error);
+      // Set default values if database tables don't exist
+      setUserPoints(0);
+      setUserLevel(1);
     }
   };
 
@@ -88,24 +91,29 @@ export const useGamification = () => {
         .eq('name', achievementName)
         .single();
 
-      if (!achievement) return false;
+      if (!achievement || typeof achievement !== 'object' || !('id' in achievement)) {
+        console.log('Achievement not found or invalid:', achievementName);
+        return false;
+      }
 
       // Check if user already has this achievement
       const { data: existingAward } = await supabase
         .from('user_achievements' as any)
         .select('*')
         .eq('user_id', user.id)
-        .eq('achievement_id', achievement.id)
+        .eq('achievement_id', (achievement as any).id)
         .single();
 
-      if (existingAward) return false; // Already has achievement
+      if (existingAward && typeof existingAward === 'object' && 'id' in existingAward) {
+        return false; // Already has achievement
+      }
 
       // Award the achievement
       const { error: awardError } = await supabase
         .from('user_achievements' as any)
         .insert({
           user_id: user.id,
-          achievement_id: achievement.id
+          achievement_id: (achievement as any).id
         });
 
       if (awardError) {
@@ -114,17 +122,18 @@ export const useGamification = () => {
       }
 
       // Update user points
+      const achievementPoints = (achievement as any).points || 0;
       const { error: pointsError } = await supabase
         .from('user_points' as any)
         .upsert({
           user_id: user.id,
-          total_points: userPoints + achievement.points,
-          level: Math.floor((userPoints + achievement.points) / 50) + 1
+          total_points: userPoints + achievementPoints,
+          level: Math.floor((userPoints + achievementPoints) / 50) + 1
         });
 
       if (!pointsError) {
-        setUserPoints(prev => prev + achievement.points);
-        setUserLevel(Math.floor((userPoints + achievement.points) / 50) + 1);
+        setUserPoints(prev => prev + achievementPoints);
+        setUserLevel(Math.floor((userPoints + achievementPoints) / 50) + 1);
       }
 
       return true;
