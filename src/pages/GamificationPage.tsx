@@ -17,6 +17,7 @@ interface Achievement {
   points: number;
   category: string;
   earned_at?: string;
+  created_at?: string;
 }
 
 interface UserStats {
