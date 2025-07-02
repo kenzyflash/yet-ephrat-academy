@@ -51,7 +51,7 @@ export const useGamification = () => {
         .eq('user_id', user.id)
         .single();
       
-      if (pointsData && !pointsError && typeof pointsData === 'object' && 'total_points' in pointsData) {
+      if (pointsData && !pointsError && typeof pointsData === 'object' && 'total_points' in pointsData && pointsData !== null) {
         setUserPoints((pointsData as any).total_points || 0);
         setUserLevel((pointsData as any).level || 1);
         return;
@@ -91,7 +91,7 @@ export const useGamification = () => {
         .eq('name', achievementName)
         .single();
 
-      if (!achievement || typeof achievement !== 'object' || !('id' in achievement)) {
+      if (!achievement || typeof achievement !== 'object' || !('id' in achievement) || achievement === null) {
         console.log('Achievement not found or invalid:', achievementName);
         return false;
       }
@@ -104,7 +104,7 @@ export const useGamification = () => {
         .eq('achievement_id', (achievement as any).id)
         .single();
 
-      if (existingAward && typeof existingAward === 'object' && 'id' in existingAward) {
+      if (existingAward && typeof existingAward === 'object' && 'id' in existingAward && existingAward !== null) {
         return false; // Already has achievement
       }
 

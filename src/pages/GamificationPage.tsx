@@ -49,7 +49,18 @@ const GamificationPage = () => {
         .order('category', { ascending: true });
 
       if (!achievementsError && allAchievements && Array.isArray(allAchievements)) {
-        setAchievements(allAchievements as Achievement[]);
+        // Type guard to ensure valid achievement data
+        const validAchievements = allAchievements.filter((item): item is Achievement => 
+          item && 
+          typeof item === 'object' && 
+          'id' in item && 
+          'name' in item && 
+          'description' in item &&
+          'icon' in item &&
+          'points' in item &&
+          'category' in item
+        );
+        setAchievements(validAchievements);
       } else {
         console.log('Achievements table not ready yet');
         setAchievements([]);
@@ -70,11 +81,11 @@ const GamificationPage = () => {
           .map((userAch: any) => {
             if (userAch && typeof userAch === 'object' && 'achievement_id' in userAch) {
               const achievement = allAchievements.find((ach: any) => ach && typeof ach === 'object' && ach.id === userAch.achievement_id);
-              return achievement ? { ...achievement, earned_at: userAch.earned_at } : null;
+              return achievement && typeof achievement === 'object' ? { ...achievement, earned_at: userAch.earned_at } : null;
             }
             return null;
           })
-          .filter(Boolean) as Achievement[];
+          .filter((item): item is Achievement => item !== null);
         
         setUserAchievements(earnedAchievements);
       } else {
@@ -88,7 +99,7 @@ const GamificationPage = () => {
         .eq('user_id', user?.id)
         .single();
 
-      if (!pointsError && userPoints && typeof userPoints === 'object' && 'total_points' in userPoints) {
+      if (!pointsError && userPoints && typeof userPoints === 'object' && 'total_points' in userPoints && userPoints !== null) {
         setUserStats({
           totalPoints: (userPoints as any).total_points || 0,
           level: (userPoints as any).level || 1,

@@ -128,8 +128,8 @@ const ParentDashboard = () => {
         childId,
         totalCourses,
         completedCourses,
-        totalPoints: (userPoints && typeof userPoints === 'object' && 'total_points' in userPoints) ? (userPoints as any).total_points || 0 : 0,
-        level: (userPoints && typeof userPoints === 'object' && 'level' in userPoints) ? (userPoints as any).level || 1 : 1,
+        totalPoints: (userPoints && typeof userPoints === 'object' && 'total_points' in userPoints && userPoints !== null) ? (userPoints as any).total_points || 0 : 0,
+        level: (userPoints && typeof userPoints === 'object' && 'level' in userPoints && userPoints !== null) ? (userPoints as any).level || 1 : 1,
         achievements: achievements?.length || 0,
         studyTimeThisWeek,
         recentActivity: 'Active this week'

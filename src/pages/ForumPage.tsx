@@ -53,7 +53,19 @@ const ForumPage = () => {
         .order('created_at', { ascending: false });
 
       if (!error && data && Array.isArray(data)) {
-        setForums(data as Forum[]);
+        // Type guard to ensure we only set valid forum data
+        const validForums = data.filter((item): item is Forum => 
+          item && 
+          typeof item === 'object' && 
+          'id' in item && 
+          'title' in item && 
+          'description' in item &&
+          'category' in item &&
+          'created_at' in item &&
+          'created_by' in item &&
+          'is_active' in item
+        );
+        setForums(validForums);
       } else {
         console.log('Forums table not ready yet');
         // Show some default forums if database not ready
