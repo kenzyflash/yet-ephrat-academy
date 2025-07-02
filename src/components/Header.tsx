@@ -1,29 +1,44 @@
-
-import { BookOpen, Menu, X } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Menu } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import LoginModal from "@/components/auth/LoginModal";
+import RegisterModal from "@/components/auth/RegisterModal";
+import ProfileDropdown from "@/components/ProfileDropdown";
+import NotificationButton from "@/components/NotificationButton";
 
 const Header = () => {
+  const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
 
   return (
-    <header className="bg-white/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+    <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <BookOpen className="h-8 w-8 text-emerald-600" />
-            <span className="text-2xl font-bold text-gray-800">SafHub</span>
+            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">S</span>
+            </div>
+            <span className="text-xl font-bold text-gray-800">SafHub</span>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <Link to="/" className="text-gray-600 hover:text-emerald-600 transition-colors">
               Home
             </Link>
             <Link to="/courses" className="text-gray-600 hover:text-emerald-600 transition-colors">
               Courses
+            </Link>
+            <Link to="/forum" className="text-gray-600 hover:text-emerald-600 transition-colors">
+              Forum
+            </Link>
+            <Link to="/achievements" className="text-gray-600 hover:text-emerald-600 transition-colors">
+              Achievements
             </Link>
             <Link to="/about" className="text-gray-600 hover:text-emerald-600 transition-colors">
               About
@@ -33,69 +48,77 @@ const Header = () => {
             </Link>
           </nav>
 
-          {/* Desktop Actions */}
-          <div className="hidden md:flex items-center space-x-4">
-            <Button asChild>
-              <Link to="/courses">Get Started</Link>
-            </Button>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="h-6 w-6 text-gray-600" />
+          {/* Auth Section */}
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <div className="flex items-center space-x-4">
+                <NotificationButton />
+                <ProfileDropdown />
+              </div>
             ) : (
-              <Menu className="h-6 w-6 text-gray-600" />
-            )}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t">
-            <nav className="flex flex-col space-y-4">
-              <Link 
-                to="/" 
-                className="text-gray-600 hover:text-emerald-600 transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link 
-                to="/courses" 
-                className="text-gray-600 hover:text-emerald-600 transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Courses
-              </Link>
-              <Link 
-                to="/about" 
-                className="text-gray-600 hover:text-emerald-600 transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                About
-              </Link>
-              <Link 
-                to="/contact" 
-                className="text-gray-600 hover:text-emerald-600 transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Contact
-              </Link>
-              <div className="flex flex-col space-y-2 pt-4">
-                <Button asChild>
-                  <Link to="/courses" onClick={() => setIsMenuOpen(false)}>
-                    Get Started
-                  </Link>
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" onClick={() => setShowLogin(true)}>
+                  Login
+                </Button>
+                <Button onClick={() => setShowRegister(true)}>
+                  Sign Up
                 </Button>
               </div>
-            </nav>
+            )}
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-gray-600 hover:text-gray-800 focus:outline-none"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        {isMenuOpen && (
+          <div className="md:hidden py-4 border-t">
+            <div className="flex flex-col space-y-2">
+              <Link to="/" className="text-gray-600 hover:text-emerald-600 transition-colors py-2">
+                Home
+              </Link>
+              <Link to="/courses" className="text-gray-600 hover:text-emerald-600 transition-colors py-2">
+                Courses
+              </Link>
+              <Link to="/forum" className="text-gray-600 hover:text-emerald-600 transition-colors py-2">
+                Forum
+              </Link>
+              <Link to="/achievements" className="text-gray-600 hover:text-emerald-600 transition-colors py-2">
+                Achievements
+              </Link>
+              <Link to="/about" className="text-gray-600 hover:text-emerald-600 transition-colors py-2">
+                About
+              </Link>
+              <Link to="/contact" className="text-gray-600 hover:text-emerald-600 transition-colors py-2">
+                Contact
+              </Link>
+              
+              {!user && (
+                <div className="flex flex-col space-y-2 pt-4 border-t">
+                  <Button variant="ghost" onClick={() => setShowLogin(true)} className="justify-start">
+                    Login
+                  </Button>
+                  <Button onClick={() => setShowRegister(true)} className="justify-start">
+                    Sign Up
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <LoginModal open={showLogin} onOpenChange={setShowLogin} />
+      <RegisterModal open={showRegister} onOpenChange={setShowRegister} />
     </header>
   );
 };

@@ -1,7 +1,7 @@
-
-import { useState, useEffect } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,61 +9,38 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { LogOut, UserCircle } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import ProfileSettingsModal from "./ProfileSettingsModal";
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button";
+import { User, Settings, LogOut, Trophy, MessageSquare } from "lucide-react";
+import ProfileSettingsModal from "@/components/ProfileSettingsModal";
+import { Badge } from "@/components/ui/badge";
+
+interface ProfileDropdownProps {
+  
+}
 
 const ProfileDropdown = () => {
-  const { user, signOut } = useAuth();
-  const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const { user, logout, userRole } = useAuth();
+  const navigate = useNavigate();
+  const [showSettings, setShowSettings] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchUserProfile();
-    }
-  }, [user]);
-
-  const fetchUserProfile = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('avatar_url, first_name, last_name')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return;
-      }
-
-      if (data) {
-        setUserProfile(data);
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
   };
 
-  const getInitials = () => {
-    if (userProfile?.first_name && userProfile?.last_name) {
-      return `${userProfile.first_name[0]}${userProfile.last_name[0]}`.toUpperCase();
+  const getDashboardLink = () => {
+    switch (userRole) {
+      case 'admin':
+        return '/admin-dashboard';
+      case 'teacher':
+        return '/teacher-dashboard';
+      case 'parent':
+        return '/parent-dashboard';
+      default:
+        return '/student-dashboard';
     }
-    if (user?.email) {
-      return user.email.substring(0, 2).toUpperCase();
-    }
-    return "U";
-  };
-
-  const getDisplayName = () => {
-    if (userProfile?.first_name && userProfile?.last_name) {
-      return `${userProfile.first_name} ${userProfile.last_name}`;
-    }
-    return user?.email?.split('@')[0] || 'User';
   };
 
   return (
@@ -72,8 +49,10 @@ const ProfileDropdown = () => {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={userProfile?.avatar_url} alt="Profile" />
-              <AvatarFallback>{getInitials()}</AvatarFallback>
+              <AvatarImage src={user?.avatar_url || ''} alt={user?.email || ''} />
+              <AvatarFallback>
+                {user?.email?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
@@ -81,29 +60,55 @@ const ProfileDropdown = () => {
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">
-                {getDisplayName()}
+                {user?.first_name} {user?.last_name}
               </p>
               <p className="text-xs leading-none text-muted-foreground">
                 {user?.email}
               </p>
+              {userRole && (
+                <Badge variant="secondary" className="w-fit text-xs">
+                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                </Badge>
+              )}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setShowProfileSettings(true)}>
-            <UserCircle className="mr-2 h-4 w-4" />
-            <span>Profile Settings</span>
+          <DropdownMenuItem asChild>
+            <Link to={getDashboardLink()} className="flex items-center">
+              <User className="mr-2 h-4 w-4" />
+              Dashboard
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/achievements" className="flex items-center">
+              <Trophy className="mr-2 h-4 w-4" />
+              Achievements
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/forum" className="flex items-center">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Community Forum
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowSettings(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={signOut}>
+          <DropdownMenuItem 
+            onClick={handleLogout}
+            className="text-red-600 focus:text-red-600"
+          >
             <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
+            Log out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <ProfileSettingsModal 
-        open={showProfileSettings} 
-        onOpenChange={setShowProfileSettings} 
+        open={showSettings} 
+        onOpenChange={setShowSettings} 
       />
     </>
   );
