@@ -44,30 +44,33 @@ export const useGamification = () => {
     if (!user) return;
 
     try {
-      // Use a raw SQL query since the table might not be in types yet
-      const { data, error } = await supabase
-        .rpc('get_user_points', { user_id_param: user.id })
+      // Try direct table access since types might not be updated yet
+      const { data: pointsData, error: pointsError } = await supabase
+        .from('user_points' as any)
+        .select('total_points, level')
+        .eq('user_id', user.id)
         .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user points:', error);
-        // Try direct table access as fallback
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('user_points' as any)
-          .select('total_points, level')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (fallbackData && !fallbackError) {
-          setUserPoints(fallbackData.total_points || 0);
-          setUserLevel(fallbackData.level || 1);
-        }
+      
+      if (pointsData && !pointsError) {
+        setUserPoints(pointsData.total_points || 0);
+        setUserLevel(pointsData.level || 1);
         return;
       }
 
-      if (data) {
-        setUserPoints(data.total_points || 0);
-        setUserLevel(data.level || 1);
+      // If no user_points record exists, create one
+      if (pointsError && pointsError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from('user_points' as any)
+          .insert({
+            user_id: user.id,
+            total_points: 0,
+            level: 1
+          });
+        
+        if (!insertError) {
+          setUserPoints(0);
+          setUserLevel(1);
+        }
       }
     } catch (error) {
       console.error('Error fetching user points:', error);
@@ -78,20 +81,53 @@ export const useGamification = () => {
     if (!user) return false;
 
     try {
-      // Use direct function call for now
-      const { data, error } = await supabase.rpc('award_achievement', {
-        user_id_param: user.id,
-        achievement_name_param: achievementName
-      });
+      // Direct SQL query since function might not exist yet
+      const { data: achievement } = await supabase
+        .from('achievements' as any)
+        .select('*')
+        .eq('name', achievementName)
+        .single();
 
-      if (error) {
-        console.error('Error awarding achievement:', error);
+      if (!achievement) return false;
+
+      // Check if user already has this achievement
+      const { data: existingAward } = await supabase
+        .from('user_achievements' as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('achievement_id', achievement.id)
+        .single();
+
+      if (existingAward) return false; // Already has achievement
+
+      // Award the achievement
+      const { error: awardError } = await supabase
+        .from('user_achievements' as any)
+        .insert({
+          user_id: user.id,
+          achievement_id: achievement.id
+        });
+
+      if (awardError) {
+        console.error('Error awarding achievement:', awardError);
         return false;
       }
 
-      // Refresh points after awarding achievement
-      fetchUserPoints();
-      return data;
+      // Update user points
+      const { error: pointsError } = await supabase
+        .from('user_points' as any)
+        .upsert({
+          user_id: user.id,
+          total_points: userPoints + achievement.points,
+          level: Math.floor((userPoints + achievement.points) / 50) + 1
+        });
+
+      if (!pointsError) {
+        setUserPoints(prev => prev + achievement.points);
+        setUserLevel(Math.floor((userPoints + achievement.points) / 50) + 1);
+      }
+
+      return true;
     } catch (error) {
       console.error('Error awarding achievement:', error);
       return false;

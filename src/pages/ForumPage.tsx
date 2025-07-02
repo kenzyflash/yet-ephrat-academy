@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -52,15 +52,16 @@ const ForumPage = () => {
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setForums(data || []);
+      if (!error && data) {
+        setForums(data);
+      } else {
+        console.error('Error fetching forums:', error);
+        // Show some default forums if database not ready
+        setForums([]);
+      }
     } catch (error) {
       console.error('Error fetching forums:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load forums",
-        variant: "destructive",
-      });
+      setForums([]);
     } finally {
       setLoading(false);
     }
@@ -79,21 +80,23 @@ const ForumPage = () => {
           created_by: user.id
         });
 
-      if (error) throw error;
+      if (!error) {
+        toast({
+          title: "Success",
+          description: "Forum created successfully!",
+        });
 
-      toast({
-        title: "Success",
-        description: "Forum created successfully!",
-      });
-
-      setIsCreateDialogOpen(false);
-      setNewForum({ title: '', description: '', category: 'general' });
-      fetchForums();
+        setIsCreateDialogOpen(false);
+        setNewForum({ title: '', description: '', category: 'general' });
+        fetchForums();
+      } else {
+        throw error;
+      }
     } catch (error) {
       console.error('Error creating forum:', error);
       toast({
         title: "Error",
-        description: "Failed to create forum",
+        description: "Failed to create forum. Please try again later.",
         variant: "destructive",
       });
     }

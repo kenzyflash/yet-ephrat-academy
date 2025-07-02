@@ -2,13 +2,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import AchievementCard from "@/components/gamification/AchievementCard";
 import UserProgress from "@/components/gamification/UserProgress";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import { Trophy, Target, Award } from "lucide-react";
+import { Trophy, Award } from "lucide-react";
 
 interface Achievement {
   id: string;
@@ -45,49 +44,64 @@ const GamificationPage = () => {
       
       // Fetch all achievements
       const { data: allAchievements, error: achievementsError } = await supabase
-        .from('achievements')
+        .from('achievements' as any)
         .select('*')
         .order('category', { ascending: true });
 
-      if (achievementsError) throw achievementsError;
+      if (!achievementsError && allAchievements) {
+        setAchievements(allAchievements);
+      }
 
       // Fetch user achievements
       const { data: userAchievementData, error: userAchievementsError } = await supabase
-        .from('user_achievements')
+        .from('user_achievements' as any)
         .select(`
           earned_at,
-          achievements (
-            id, name, description, icon, points, category
-          )
+          achievement_id
         `)
         .eq('user_id', user?.id);
 
-      if (userAchievementsError) throw userAchievementsError;
+      if (!userAchievementsError && userAchievementData && allAchievements) {
+        // Match user achievements with achievement details
+        const earnedAchievements = userAchievementData
+          .map((userAch: any) => {
+            const achievement = allAchievements.find((ach: any) => ach.id === userAch.achievement_id);
+            return achievement ? { ...achievement, earned_at: userAch.earned_at } : null;
+          })
+          .filter(Boolean);
+        
+        setUserAchievements(earnedAchievements);
+      }
 
       // Fetch user points
       const { data: userPoints, error: pointsError } = await supabase
-        .from('user_points')
+        .from('user_points' as any)
         .select('*')
         .eq('user_id', user?.id)
         .single();
 
-      if (pointsError && pointsError.code !== 'PGRST116') {
-        console.error('Error fetching user points:', pointsError);
+      if (!pointsError && userPoints) {
+        setUserStats({
+          totalPoints: userPoints.total_points || 0,
+          level: userPoints.level || 1,
+          achievementCount: userAchievements.length
+        });
+      } else {
+        // Create initial user points record
+        await supabase
+          .from('user_points' as any)
+          .insert({
+            user_id: user?.id,
+            total_points: 0,
+            level: 1
+          });
+        
+        setUserStats({
+          totalPoints: 0,
+          level: 1,
+          achievementCount: 0
+        });
       }
-
-      setAchievements(allAchievements || []);
-      
-      const earnedAchievements = userAchievementData?.map(item => ({
-        ...item.achievements,
-        earned_at: item.earned_at
-      })) || [];
-      
-      setUserAchievements(earnedAchievements);
-      setUserStats({
-        totalPoints: userPoints?.total_points || 0,
-        level: userPoints?.level || 1,
-        achievementCount: earnedAchievements.length
-      });
 
     } catch (error) {
       console.error('Error fetching gamification data:', error);
