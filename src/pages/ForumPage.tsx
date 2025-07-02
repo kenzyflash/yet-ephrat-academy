@@ -45,8 +45,9 @@ const ForumPage = () => {
   const fetchForums = async () => {
     try {
       setLoading(true);
+      // Use direct table access since types might not be updated yet
       const { data, error } = await supabase
-        .from('forums')
+        .from('forums' as any)
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
@@ -70,7 +71,7 @@ const ForumPage = () => {
 
     try {
       const { error } = await supabase
-        .from('forums')
+        .from('forums' as any)
         .insert({
           title: newForum.title,
           description: newForum.description,

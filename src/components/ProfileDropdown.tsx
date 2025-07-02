@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,17 +17,13 @@ import { User, Settings, LogOut, Trophy, MessageSquare } from "lucide-react";
 import ProfileSettingsModal from "@/components/ProfileSettingsModal";
 import { Badge } from "@/components/ui/badge";
 
-interface ProfileDropdownProps {
-  
-}
-
 const ProfileDropdown = () => {
-  const { user, logout, userRole } = useAuth();
+  const { user, signOut, userRole } = useAuth();
   const navigate = useNavigate();
   const [showSettings, setShowSettings] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/');
   };
 
@@ -43,13 +40,18 @@ const ProfileDropdown = () => {
     }
   };
 
+  // Get user data from the user object or fallback values
+  const firstName = user?.user_metadata?.first_name || '';
+  const lastName = user?.user_metadata?.last_name || '';
+  const avatarUrl = user?.user_metadata?.avatar_url || '';
+
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={user?.avatar_url || ''} alt={user?.email || ''} />
+              <AvatarImage src={avatarUrl} alt={user?.email || ''} />
               <AvatarFallback>
                 {user?.email?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
@@ -60,7 +62,7 @@ const ProfileDropdown = () => {
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">
-                {user?.first_name} {user?.last_name}
+                {firstName} {lastName}
               </p>
               <p className="text-xs leading-none text-muted-foreground">
                 {user?.email}

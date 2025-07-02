@@ -24,9 +24,11 @@ export const useGamification = () => {
             filter: `user_id=eq.${user.id}`
           },
           (payload) => {
-            if (payload.new) {
-              setUserPoints(payload.new.total_points);
-              setUserLevel(payload.new.level);
+            console.log('User points updated:', payload);
+            if (payload.new && typeof payload.new === 'object') {
+              const newData = payload.new as any;
+              setUserPoints(newData.total_points || 0);
+              setUserLevel(newData.level || 1);
             }
           }
         )
@@ -42,20 +44,30 @@ export const useGamification = () => {
     if (!user) return;
 
     try {
+      // Use a raw SQL query since the table might not be in types yet
       const { data, error } = await supabase
-        .from('user_points')
-        .select('total_points, level')
-        .eq('user_id', user.id)
+        .rpc('get_user_points', { user_id_param: user.id })
         .single();
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching user points:', error);
+        // Try direct table access as fallback
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('user_points' as any)
+          .select('total_points, level')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (fallbackData && !fallbackError) {
+          setUserPoints(fallbackData.total_points || 0);
+          setUserLevel(fallbackData.level || 1);
+        }
         return;
       }
 
       if (data) {
-        setUserPoints(data.total_points);
-        setUserLevel(data.level);
+        setUserPoints(data.total_points || 0);
+        setUserLevel(data.level || 1);
       }
     } catch (error) {
       console.error('Error fetching user points:', error);
@@ -66,6 +78,7 @@ export const useGamification = () => {
     if (!user) return false;
 
     try {
+      // Use direct function call for now
       const { data, error } = await supabase.rpc('award_achievement', {
         user_id_param: user.id,
         achievement_name_param: achievementName
@@ -76,6 +89,8 @@ export const useGamification = () => {
         return false;
       }
 
+      // Refresh points after awarding achievement
+      fetchUserPoints();
       return data;
     } catch (error) {
       console.error('Error awarding achievement:', error);

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -117,8 +118,22 @@ const Header = () => {
       </div>
 
       {/* Modals */}
-      <LoginModal open={showLogin} onOpenChange={setShowLogin} />
-      <RegisterModal open={showRegister} onOpenChange={setShowRegister} />
+      <LoginModal 
+        open={showLogin} 
+        onOpenChange={setShowLogin}
+        onSwitchToRegister={() => {
+          setShowLogin(false);
+          setShowRegister(true);
+        }}
+      />
+      <RegisterModal 
+        open={showRegister} 
+        onOpenChange={setShowRegister}
+        onSwitchToLogin={() => {
+          setShowRegister(false);
+          setShowLogin(true);
+        }}
+      />
     </header>
   );
 };
