@@ -44,23 +44,22 @@ export const useGamification = () => {
     if (!user) return;
 
     try {
-      // Try direct table access since types might not be updated yet
       const { data: pointsData, error: pointsError } = await supabase
-        .from('user_points' as any)
+        .from('user_points')
         .select('total_points, level')
         .eq('user_id', user.id)
         .single();
       
-      if (pointsData && !pointsError && typeof pointsData === 'object' && 'total_points' in pointsData && pointsData !== null) {
-        setUserPoints((pointsData as any).total_points || 0);
-        setUserLevel((pointsData as any).level || 1);
+      if (pointsData && !pointsError) {
+        setUserPoints(pointsData.total_points || 0);
+        setUserLevel(pointsData.level || 1);
         return;
       }
 
       // If no user_points record exists, create one
       if (pointsError && pointsError.code === 'PGRST116') {
         const { error: insertError } = await supabase
-          .from('user_points' as any)
+          .from('user_points')
           .insert({
             user_id: user.id,
             total_points: 0,
@@ -74,7 +73,6 @@ export const useGamification = () => {
       }
     } catch (error) {
       console.error('Error fetching user points:', error);
-      // Set default values if database tables don't exist
       setUserPoints(0);
       setUserLevel(1);
     }
@@ -84,36 +82,35 @@ export const useGamification = () => {
     if (!user) return false;
 
     try {
-      // Direct SQL query since function might not exist yet
       const { data: achievement } = await supabase
-        .from('achievements' as any)
+        .from('achievements')
         .select('*')
         .eq('name', achievementName)
         .single();
 
-      if (!achievement || typeof achievement !== 'object' || !('id' in achievement) || achievement === null) {
-        console.log('Achievement not found or invalid:', achievementName);
+      if (!achievement) {
+        console.log('Achievement not found:', achievementName);
         return false;
       }
 
       // Check if user already has this achievement
       const { data: existingAward } = await supabase
-        .from('user_achievements' as any)
+        .from('user_achievements')
         .select('*')
         .eq('user_id', user.id)
-        .eq('achievement_id', (achievement as any).id)
+        .eq('achievement_id', achievement.id)
         .single();
 
-      if (existingAward && typeof existingAward === 'object' && 'id' in existingAward && existingAward !== null) {
+      if (existingAward) {
         return false; // Already has achievement
       }
 
       // Award the achievement
       const { error: awardError } = await supabase
-        .from('user_achievements' as any)
+        .from('user_achievements')
         .insert({
           user_id: user.id,
-          achievement_id: (achievement as any).id
+          achievement_id: achievement.id
         });
 
       if (awardError) {
@@ -122,9 +119,9 @@ export const useGamification = () => {
       }
 
       // Update user points
-      const achievementPoints = (achievement as any).points || 0;
+      const achievementPoints = achievement.points || 0;
       const { error: pointsError } = await supabase
-        .from('user_points' as any)
+        .from('user_points')
         .upsert({
           user_id: user.id,
           total_points: userPoints + achievementPoints,

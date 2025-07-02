@@ -44,46 +44,32 @@ const GamificationPage = () => {
       
       // Fetch all achievements
       const { data: allAchievements, error: achievementsError } = await supabase
-        .from('achievements' as any)
+        .from('achievements')
         .select('*')
         .order('category', { ascending: true });
 
-      if (!achievementsError && allAchievements && Array.isArray(allAchievements)) {
-        // Type guard to ensure valid achievement data
-        const validAchievements = allAchievements.filter((item): item is Achievement => 
-          item && 
-          typeof item === 'object' && 
-          'id' in item && 
-          'name' in item && 
-          'description' in item &&
-          'icon' in item &&
-          'points' in item &&
-          'category' in item
-        );
-        setAchievements(validAchievements);
+      if (!achievementsError && allAchievements) {
+        setAchievements(allAchievements);
       } else {
-        console.log('Achievements table not ready yet');
+        console.log('Error fetching achievements:', achievementsError);
         setAchievements([]);
       }
 
       // Fetch user achievements
       const { data: userAchievementData, error: userAchievementsError } = await supabase
-        .from('user_achievements' as any)
+        .from('user_achievements')
         .select(`
           earned_at,
           achievement_id
         `)
         .eq('user_id', user?.id);
 
-      if (!userAchievementsError && userAchievementData && Array.isArray(userAchievementData) && Array.isArray(allAchievements)) {
+      if (!userAchievementsError && userAchievementData && allAchievements) {
         // Match user achievements with achievement details
         const earnedAchievements = userAchievementData
-          .map((userAch: any) => {
-            if (userAch && typeof userAch === 'object' && 'achievement_id' in userAch) {
-              const achievement = allAchievements.find((ach: any) => ach && typeof ach === 'object' && ach.id === userAch.achievement_id);
-              return achievement && typeof achievement === 'object' ? { ...achievement, earned_at: userAch.earned_at } : null;
-            }
-            return null;
+          .map((userAch) => {
+            const achievement = allAchievements.find((ach) => ach.id === userAch.achievement_id);
+            return achievement ? { ...achievement, earned_at: userAch.earned_at } : null;
           })
           .filter((item): item is Achievement => item !== null);
         
@@ -94,21 +80,21 @@ const GamificationPage = () => {
 
       // Fetch user points
       const { data: userPoints, error: pointsError } = await supabase
-        .from('user_points' as any)
+        .from('user_points')
         .select('*')
         .eq('user_id', user?.id)
         .single();
 
-      if (!pointsError && userPoints && typeof userPoints === 'object' && 'total_points' in userPoints && userPoints !== null) {
+      if (!pointsError && userPoints) {
         setUserStats({
-          totalPoints: (userPoints as any).total_points || 0,
-          level: (userPoints as any).level || 1,
+          totalPoints: userPoints.total_points || 0,
+          level: userPoints.level || 1,
           achievementCount: userAchievements.length
         });
       } else {
         // Create initial user points record
         await supabase
-          .from('user_points' as any)
+          .from('user_points')
           .insert({
             user_id: user?.id,
             total_points: 0,
@@ -124,7 +110,6 @@ const GamificationPage = () => {
 
     } catch (error) {
       console.error('Error fetching gamification data:', error);
-      // Set default values when database isn't ready
       setAchievements([]);
       setUserAchievements([]);
       setUserStats({ totalPoints: 0, level: 1, achievementCount: 0 });
