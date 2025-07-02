@@ -16,8 +16,11 @@ interface Achievement {
   icon: string;
   points: number;
   category: string;
-  earned_at?: string;
   created_at?: string;
+}
+
+interface EarnedAchievement extends Achievement {
+  earned_at: string;
 }
 
 interface UserStats {
@@ -29,7 +32,7 @@ interface UserStats {
 const GamificationPage = () => {
   const { user } = useAuth();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [userAchievements, setUserAchievements] = useState<Achievement[]>([]);
+  const [userAchievements, setUserAchievements] = useState<EarnedAchievement[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({ totalPoints: 0, level: 1, achievementCount: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -72,7 +75,7 @@ const GamificationPage = () => {
             const achievement = allAchievements.find((ach) => ach.id === userAch.achievement_id);
             return achievement ? { ...achievement, earned_at: userAch.earned_at } : null;
           })
-          .filter((item): item is Achievement => item !== null);
+          .filter((item): item is EarnedAchievement => item !== null);
         
         setUserAchievements(earnedAchievements);
       } else {
