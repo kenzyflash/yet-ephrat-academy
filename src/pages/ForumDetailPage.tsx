@@ -102,26 +102,64 @@ const ForumDetailPage = () => {
   const fetchForumPosts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // First, get the forum posts
+      const { data: postsData, error: postsError } = await supabase
         .from('forum_posts')
-        .select(`
-          *,
-          profiles!inner(first_name, last_name)
-        `)
+        .select('*')
         .eq('forum_id', id)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        const postsWithAuthor = data.map(post => ({
-          ...post,
-          author_name: `${post.profiles.first_name} ${post.profiles.last_name}`,
-          reply_count: 0 // TODO: Add actual reply count when replies are implemented
-        }));
-        setPosts(postsWithAuthor);
-      } else {
-        console.error('Error fetching posts:', error);
+      if (postsError) {
+        console.error('Error fetching posts:', postsError);
         setPosts([]);
+        return;
       }
+
+      if (!postsData || postsData.length === 0) {
+        setPosts([]);
+        return;
+      }
+
+      // Get unique user IDs from posts
+      const userIds = [...new Set(postsData.map(post => post.user_id))];
+      
+      // Fetch profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        // Still show posts but without author names
+        const postsWithoutAuthors = postsData.map(post => ({
+          ...post,
+          author_name: 'Anonymous',
+          reply_count: 0
+        }));
+        setPosts(postsWithoutAuthors);
+        return;
+      }
+
+      // Create a map of user ID to profile
+      const profilesMap = new Map(
+        profilesData?.map(profile => [profile.id, profile]) || []
+      );
+
+      // Combine posts with profile data
+      const postsWithAuthors = postsData.map(post => {
+        const profile = profilesMap.get(post.user_id);
+        return {
+          ...post,
+          author_name: profile 
+            ? `${profile.first_name} ${profile.last_name}`.trim() || 'Anonymous'
+            : 'Anonymous',
+          reply_count: 0 // TODO: Add actual reply count when replies are implemented
+        };
+      });
+
+      setPosts(postsWithAuthors);
     } catch (error) {
       console.error('Error fetching posts:', error);
       setPosts([]);
