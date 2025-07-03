@@ -15,6 +15,7 @@ import CoursePage from "./pages/CoursePage";
 import NotFound from "./pages/NotFound";
 import GamificationPage from "@/pages/GamificationPage";
 import ForumPage from "@/pages/ForumPage";
+import ForumDetailPage from "@/pages/ForumDetailPage";
 import ParentDashboard from "@/pages/ParentDashboard";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ function App() {
                 <Route path="/parent-dashboard" element={<ParentDashboard />} />
                 <Route path="/achievements" element={<GamificationPage />} />
                 <Route path="/forum" element={<ForumPage />} />
+                <Route path="/forum/:id" element={<ForumDetailPage />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

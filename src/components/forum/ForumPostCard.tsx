@@ -44,11 +44,11 @@ const ForumPostCard = ({ post, onClick }: ForumPostCardProps) => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1 text-green-600">
               <ThumbsUp className="h-4 w-4" />
-              <span className="text-sm">{post.upvotes}</span>
+              <span className="text-sm">{post.upvotes || 0}</span>
             </div>
             <div className="flex items-center gap-1 text-red-600">
               <ThumbsDown className="h-4 w-4" />
-              <span className="text-sm">{post.downvotes}</span>
+              <span className="text-sm">{post.downvotes || 0}</span>
             </div>
             <div className="flex items-center gap-1 text-blue-600">
               <MessageCircle className="h-4 w-4" />

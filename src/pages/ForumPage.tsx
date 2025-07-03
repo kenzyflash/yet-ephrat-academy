@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ interface Forum {
 const ForumPage = () => {
   const { user, userRole } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [forums, setForums] = useState<Forum[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -228,8 +229,7 @@ const ForumPage = () => {
                 key={forum.id}
                 forum={forum}
                 onClick={() => {
-                  // Navigate to forum posts page
-                  window.location.href = `/forum/${forum.id}`;
+                  navigate(`/forum/${forum.id}`);
                 }}
               />
             ))}
