@@ -25,6 +25,9 @@ export const useAuth = () => {
   return context;
 };
 
+const AUTH_TIMEOUT = 15000; // 15 seconds timeout for auth operations
+const ROLE_FETCH_TIMEOUT = 10000; // 10 seconds timeout for role fetching
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -33,12 +36,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
   
-  // Refs to prevent multiple concurrent operations
   const roleUpdateInProgress = useRef(false);
   const cleanupFunctions = useRef<(() => void)[]>([]);
-  const roleRefreshTimeout = useRef<NodeJS.Timeout | null>(null);
+  const authTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clean up any existing auth state
   const cleanupAuthState = useCallback(() => {
     localStorage.removeItem('supabase.auth.token');
     Object.keys(localStorage).forEach((key) => {
@@ -48,23 +49,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, []);
 
-  // Determine the correct dashboard based on role
   const getDashboardPath = useCallback((role: string) => {
     switch (role) {
       case 'admin':
         return '/admin-dashboard';
       case 'teacher':
         return '/teacher-dashboard';
+      case 'parent':
+        return '/parent-dashboard';
       case 'student':
       default:
         return '/student-dashboard';
     }
   }, []);
 
-  // Enhanced role fetch with proper error handling and logging
   const fetchUserRole = useCallback(async (userId: string): Promise<string> => {
     if (roleUpdateInProgress.current) {
-      console.log('Role update already in progress, skipping...');
+      console.log('Role update already in progress, returning cached role');
       return userRole || 'student';
     }
 
@@ -72,19 +73,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       roleUpdateInProgress.current = true;
       console.log('Fetching role for user:', userId);
       
-      const { data, error } = await supabase
+      // Add timeout for role fetching
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Role fetch timeout')), ROLE_FETCH_TIMEOUT);
+      });
+
+      const rolePromise = supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
         .maybeSingle();
 
+      const { data, error } = await Promise.race([rolePromise, timeoutPromise]);
+
       if (error) {
         console.error('Error fetching user role:', error);
-        
-        // Enhanced error logging (when audit system is available)
-        console.log('Role fetch failed:', { userId, error: error.message });
-        
-        // Secure fallback: default to student but log the failure
         console.warn('Role fetch failed, defaulting to student for security');
         setUserRole('student');
         return 'student';
@@ -96,13 +99,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return role;
     } catch (error) {
       console.error('Unexpected error fetching user role:', error);
-      
-      // Enhanced error logging (when audit system is available)
-      console.log('Critical role fetch error:', { 
-        userId, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      });
-      
       setUserRole('student');
       return 'student';
     } finally {
@@ -110,7 +106,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [userRole]);
 
-  // Handle redirection based on role and current location
   const handleRedirection = useCallback((role: string) => {
     const currentPath = window.location.pathname;
     const targetPath = getDashboardPath(role);
@@ -136,7 +131,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [getDashboardPath]);
 
-  // Cleanup all subscriptions
   const cleanupSubscriptions = useCallback(() => {
     console.log('Cleaning up subscriptions...');
     cleanupFunctions.current.forEach(cleanup => {
@@ -148,54 +142,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     cleanupFunctions.current = [];
     
-    if (roleRefreshTimeout.current) {
-      clearTimeout(roleRefreshTimeout.current);
-      roleRefreshTimeout.current = null;
+    if (authTimeoutRef.current) {
+      clearTimeout(authTimeoutRef.current);
+      authTimeoutRef.current = null;
     }
   }, []);
 
-  // Setup secure real-time listeners with user-specific filtering
   const setupRealtimeListeners = useCallback((userId: string) => {
     console.log('Setting up secure realtime listeners for user:', userId);
 
-    // Clean up existing listeners first
     cleanupSubscriptions();
 
-    // Listen for role changes with enhanced security
+    // Simplified realtime setup with better error handling
     const roleChangesChannel = supabase
-      .channel(`user-role-changes-${userId}-${Date.now()}`)
+      .channel(`user-role-changes-${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'user_roles',
-          filter: `user_id=eq.${userId}` // User-specific filtering for security
+          filter: `user_id=eq.${userId}`
         },
         async (payload) => {
-          console.log('Secure role change detected:', payload);
+          console.log('Role change detected:', payload);
           
-          // Verify the change is for the current user
           if (payload.new && typeof payload.new === 'object' && 'user_id' in payload.new) {
             if (payload.new.user_id !== userId) {
-              console.warn('Received role change for different user, ignoring for security');
+              console.warn('Received role change for different user, ignoring');
               return;
             }
           }
           
-          // Clear any existing timeout
-          if (roleRefreshTimeout.current) {
-            clearTimeout(roleRefreshTimeout.current);
-          }
-          
-          // Debounce role refresh to prevent rapid calls
-          roleRefreshTimeout.current = setTimeout(async () => {
+          // Debounce role refresh
+          setTimeout(async () => {
             try {
               const newRole = await fetchUserRole(userId);
               
               toast({
                 title: "Role Updated",
-                description: `Your role has been updated to ${newRole}. Redirecting to appropriate dashboard...`,
+                description: `Your role has been updated to ${newRole}. Redirecting...`,
               });
               
               setTimeout(() => {
@@ -209,19 +195,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       )
       .subscribe();
 
-    // Listen for user-specific notifications only
+    // Simplified notifications channel
     const notificationsChannel = supabase
-      .channel(`user-notifications-${userId}-${Date.now()}`)
+      .channel(`user-notifications-${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${userId}` // User-specific filtering
+          filter: `user_id=eq.${userId}`
         },
         (payload) => {
-          console.log('Secure notification received:', payload);
+          console.log('Notification received:', payload);
           
           const notification = payload.new;
           if (notification && notification.type === 'general') {
@@ -234,7 +220,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       )
       .subscribe();
 
-    // Store cleanup functions
     cleanupFunctions.current = [
       () => supabase.removeChannel(roleChangesChannel),
       () => supabase.removeChannel(notificationsChannel)
@@ -243,7 +228,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return cleanupSubscriptions;
   }, [fetchUserRole, handleRedirection, toast, cleanupSubscriptions]);
 
-  // Refresh user role and handle redirection
   const refreshUserRole = useCallback(async () => {
     if (user && !roleUpdateInProgress.current) {
       console.log('Refreshing user role for:', user.id);
@@ -255,7 +239,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, fetchUserRole, getDashboardPath, handleRedirection]);
 
-  // Initialize authentication state
+  // Initialize authentication state with timeout
   useEffect(() => {
     let mounted = true;
 
@@ -263,6 +247,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         console.log('Initializing secure auth...');
         
+        // Set auth timeout
+        authTimeoutRef.current = setTimeout(() => {
+          if (mounted && loading) {
+            console.log('Auth initialization timeout');
+            setLoading(false);
+            setInitialized(true);
+          }
+        }, AUTH_TIMEOUT);
+
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -279,8 +272,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setSession(currentSession);
           setUser(currentSession.user);
           
-          await fetchUserRole(currentSession.user.id);
-          setupRealtimeListeners(currentSession.user.id);
+          // Fetch role with timeout
+          try {
+            await fetchUserRole(currentSession.user.id);
+            setupRealtimeListeners(currentSession.user.id);
+          } catch (error) {
+            console.error('Error setting up user data:', error);
+          }
         }
         
         if (mounted) {
@@ -296,14 +294,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    // Set up secure auth state listener
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Secure auth state changed:', event, session?.user?.email);
+        console.log('Auth state changed:', event, session?.user?.email);
         
         if (!mounted) return;
 
-        // Clean up existing listeners
         cleanupSubscriptions();
 
         if (event === 'SIGNED_OUT' || !session) {
@@ -318,14 +315,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user && initialized) {
-          if (event === 'SIGNED_IN') {
-            const role = await fetchUserRole(session.user.id);
-            setupRealtimeListeners(session.user.id);
-            handleRedirection(role);
-          } else {
-            await fetchUserRole(session.user.id);
-            setupRealtimeListeners(session.user.id);
-          }
+          // Use setTimeout to defer Supabase calls
+          setTimeout(async () => {
+            try {
+              const role = await fetchUserRole(session.user.id);
+              setupRealtimeListeners(session.user.id);
+              if (event === 'SIGNED_IN') {
+                handleRedirection(role);
+              }
+            } catch (error) {
+              console.error('Error in auth state change handler:', error);
+            }
+          }, 0);
         }
         
         setLoading(false);
@@ -341,13 +342,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [initialized, fetchUserRole, setupRealtimeListeners, handleRedirection, cleanupSubscriptions]);
 
-  // Enhanced input validation and sanitization
   const validateInput = (input: string, type: 'email' | 'name' | 'text'): string => {
     if (!input || typeof input !== 'string') {
       throw new Error('Invalid input provided');
     }
 
-    const sanitized = input.trim().slice(0, 255); // Basic length limit
+    const sanitized = input.trim().slice(0, 255);
 
     switch (type) {
       case 'email':
@@ -363,7 +363,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         break;
       case 'text':
-        // Basic XSS prevention
         if (/<script|javascript:|data:|vbscript:/i.test(sanitized)) {
           throw new Error('Invalid characters detected');
         }
@@ -377,7 +376,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       cleanupAuthState();
 
-      // Validate and sanitize inputs
       const cleanEmail = validateInput(email, 'email').toLowerCase();
       const cleanFirstName = validateInput(userData.first_name, 'name');
       const cleanLastName = validateInput(userData.last_name, 'name');
@@ -388,7 +386,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('Password must be at least 6 characters long');
       }
 
-      // Secure default role assignment - always default to student
       const defaultRole = 'student';
 
       const { error } = await supabase.auth.signUp({
@@ -437,7 +434,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       cleanupAuthState();
       
-      // Validate inputs
       const cleanEmail = validateInput(email, 'email').toLowerCase();
       
       if (!password?.trim()) {

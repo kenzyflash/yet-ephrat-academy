@@ -16,6 +16,8 @@ import {
   Download,
   MessageSquare,
   X,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import ProfileDropdown from "@/components/ProfileDropdown";
@@ -51,6 +53,9 @@ interface LessonProgress {
   watch_time_minutes: number;
 }
 
+const LOADING_TIMEOUT = 10000; // 10 seconds
+const MAX_RETRY_ATTEMPTS = 3;
+
 const CoursePage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -62,52 +67,106 @@ const CoursePage = () => {
   const [selectedLesson, setSelectedLesson] = useState(0);
   const [lessonProgress, setLessonProgress] = useState<LessonProgress[]>([]);
   const [courseLoading, setCourseLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
+  // Timeout for loading states
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (courseLoading) {
+        console.log('Loading timeout reached');
+        setError('Loading is taking longer than expected. Please try refreshing the page.');
+        setCourseLoading(false);
+      }
+    }, LOADING_TIMEOUT);
+
+    return () => clearTimeout(timeoutId);
+  }, [courseLoading]);
+
+  // Authentication redirect with timeout
   useEffect(() => {
     if (!loading && !user) {
+      console.log('User not authenticated, redirecting to home');
       navigate("/");
+      return;
     }
   }, [user, loading, navigate]);
 
+  // Fetch course data with retry mechanism
   useEffect(() => {
-    if (courseId && user) {
-      fetchCourseData();
-      fetchLessonProgress();
+    if (courseId && user && !loading) {
+      console.log('Fetching course data for:', courseId);
+      fetchCourseDataWithRetry();
     }
-  }, [courseId, user]);
+  }, [courseId, user, loading, retryCount]);
+
+  const fetchCourseDataWithRetry = async () => {
+    try {
+      setCourseLoading(true);
+      setError(null);
+      
+      await Promise.all([
+        fetchCourseData(),
+        fetchLessonProgress()
+      ]);
+    } catch (error) {
+      console.error('Error in fetchCourseDataWithRetry:', error);
+      if (retryCount < MAX_RETRY_ATTEMPTS) {
+        console.log(`Retrying... attempt ${retryCount + 1}`);
+        setRetryCount(prev => prev + 1);
+      } else {
+        setError('Failed to load course data. Please try refreshing the page.');
+        setCourseLoading(false);
+      }
+    }
+  };
 
   const fetchCourseData = async () => {
-    if (!courseId) return;
+    if (!courseId) {
+      throw new Error('Course ID is required');
+    }
 
     try {
-      // Fetch course details
-      const { data: courseData, error: courseError } = await supabase
+      console.log('Fetching course details...');
+      // Fetch course details with timeout
+      const coursePromise = supabase
         .from('courses')
         .select('*')
         .eq('id', courseId)
-        .single();
+        .maybeSingle();
 
-      if (courseError) throw courseError;
-      setCourse(courseData);
-
-      // Fetch lessons
-      const { data: lessonsData, error: lessonsError } = await supabase
+      const lessonsPromise = supabase
         .from('lessons')
         .select('*')
         .eq('course_id', courseId)
         .order('order_index', { ascending: true });
 
-      if (lessonsError) throw lessonsError;
-      setLessons(lessonsData || []);
+      const [courseResult, lessonsResult] = await Promise.all([
+        coursePromise,
+        lessonsPromise
+      ]);
+
+      if (courseResult.error) {
+        console.error('Course fetch error:', courseResult.error);
+        throw courseResult.error;
+      }
+
+      if (lessonsResult.error) {
+        console.error('Lessons fetch error:', lessonsResult.error);
+        throw lessonsResult.error;
+      }
+
+      if (!courseResult.data) {
+        throw new Error('Course not found');
+      }
+
+      console.log('Course data loaded successfully');
+      setCourse(courseResult.data);
+      setLessons(lessonsResult.data || []);
+      setCourseLoading(false);
     } catch (error) {
       console.error('Error fetching course data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load course data",
-        variant: "destructive"
-      });
-    } finally {
-      setCourseLoading(false);
+      throw error;
     }
   };
 
@@ -115,16 +174,24 @@ const CoursePage = () => {
     if (!user || !courseId) return;
 
     try {
+      console.log('Fetching lesson progress...');
       const { data, error } = await supabase
         .from('lesson_progress')
         .select('lesson_id, completed, watch_time_minutes')
         .eq('user_id', user.id)
         .eq('course_id', courseId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Lesson progress fetch error:', error);
+        // Don't throw here, lesson progress is not critical
+        return;
+      }
+
+      console.log('Lesson progress loaded');
       setLessonProgress(data || []);
     } catch (error) {
       console.error('Error fetching lesson progress:', error);
+      // Don't throw here, lesson progress is not critical
     }
   };
 
@@ -132,7 +199,6 @@ const CoursePage = () => {
     if (!user || !courseId) return;
 
     try {
-      // Use upsert to avoid duplicate key violations
       const { error } = await supabase
         .from('lesson_progress')
         .upsert({
@@ -155,14 +221,12 @@ const CoursePage = () => {
   const markLessonComplete = async (lessonId: string) => {
     if (!user || !courseId) return;
 
-    // Check if lesson is already completed to prevent duplicate notifications
     const alreadyCompleted = isLessonCompleted(lessonId);
     if (alreadyCompleted) {
       return;
     }
 
     try {
-      // Use upsert to avoid duplicate key violations
       const { error } = await supabase
         .from('lesson_progress')
         .upsert({
@@ -179,7 +243,6 @@ const CoursePage = () => {
 
       await fetchLessonProgress();
       
-      // Log study session
       const currentLesson = lessons.find(l => l.id === lessonId);
       if (currentLesson) {
         const today = new Date().toISOString().split('T')[0];
@@ -195,7 +258,6 @@ const CoursePage = () => {
         description: "Great job! Keep up the good work.",
       });
 
-      // Auto-advance to next lesson if available
       if (selectedLesson < lessons.length - 1) {
         setSelectedLesson(selectedLesson + 1);
       }
@@ -215,7 +277,6 @@ const CoursePage = () => {
     try {
       console.log('Removing completion for lesson:', lessonId);
       
-      // First try to update existing record
       const { error: updateError } = await supabase
         .from('lesson_progress')
         .update({
@@ -231,7 +292,6 @@ const CoursePage = () => {
         throw updateError;
       }
 
-      // Refresh the lesson progress data
       await fetchLessonProgress();
 
       toast({
@@ -267,12 +327,55 @@ const CoursePage = () => {
     return '/student-dashboard';
   };
 
-  if (loading || courseLoading) {
+  const handleRetry = () => {
+    setRetryCount(0);
+    setError(null);
+    fetchCourseDataWithRetry();
+  };
+
+  // Show loading state with timeout
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
           <BookOpen className="h-16 w-16 text-emerald-600 mx-auto mb-4 animate-spin" />
           <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry option
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Unable to Load Course</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="space-x-2">
+            <Button onClick={handleRetry} className="bg-emerald-600 hover:bg-emerald-700">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+            <Button variant="outline" onClick={() => navigate(getDashboardUrl())}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show course loading state
+  if (courseLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <BookOpen className="h-16 w-16 text-emerald-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Loading course content...</p>
+          <p className="text-sm text-gray-500 mt-2">This should only take a moment</p>
         </div>
       </div>
     );
@@ -399,7 +502,6 @@ const CoursePage = () => {
                             </Button>
                           )}
                           
-                          {/* Navigation buttons */}
                           <div className="flex gap-2">
                             {selectedLesson > 0 && (
                               <Button 
